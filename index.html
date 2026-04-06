@@ -63,6 +63,22 @@
       background: #000;
       z-index: 10;
     }
+    .search-bar {
+      padding: 12px 16px;
+      background: var(--bg-primary);
+    }
+    .search-input {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: 'Raleway', sans-serif;
+    }
+    .search-input:focus { outline: none; border-color: #1d9bf0; }
+    .search-input::placeholder { color: var(--text-muted); }
     .tab {
       flex: 1;
       padding: 14px;
@@ -292,8 +308,7 @@
     .comment-author { font-weight: 600; font-size: 13px; }
     .comment-time { font-size: 11px; color: #536471; }
     .comment-text { font-size: 14px; color: #71767b; }
-    .comment.ending { background: rgba(29,155,240,0.08); padding: 12px; border-radius: 8px; margin-bottom: 8px; }
-    .comment.ending::before { content: 'finished this story - '; color: #1d9bf0; font-size: 11px; }
+    .comment.ending { background: rgba(29,155,240,0.08); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #1d9bf0; }
     .comment.pinned { background: rgba(29,155,240,0.1); border: 1px solid rgba(29,155,240,0.3); padding: 12px; border-radius: 8px; margin-bottom: 8px; }
     .sticky-reactions {
       position: sticky;
@@ -516,6 +531,15 @@
     .theme-btn:hover { background: #121212; color: #e7e7e7; }
     .theme-btn svg { width: 20px; height: 20px; }
 
+    #user-profile-screen .profile {
+      position: relative;
+      padding-top: 60px;
+    }
+
+    #user-profile-screen .stories {
+      padding-top: 0;
+    }
+
     :root {
       --bg-primary: #000;
       --bg-secondary: #121212;
@@ -582,6 +606,9 @@
       .story-modal-header { border-radius: 20px 20px 0 0; }
       .finish-modal { align-items: center; }
       .finish-modal-content { border-radius: 20px; max-width: 500px; }
+      #user-profile-screen { padding: 0 40px; }
+      #user-profile-screen .profile { padding-top: 40px; }
+      #user-profile-screen .stories { max-width: 600px; margin: 0 auto; }
     }
   </style>
 </head>
@@ -603,6 +630,10 @@
           <button class="tab active" data-tab="unfinished">unfinished</button>
           <button class="tab" data-tab="scary">scary</button>
           <button class="tab" data-tab="finished">finished</button>
+          <button class="tab" data-tab="trending">trending</button>
+        </div>
+        <div class="search-bar">
+          <input type="text" class="search-input" id="search-input" placeholder="search stories...">
         </div>
         <div class="stories" id="stories-container"><div class="loading"><div class="spinner"></div></div></div>
       </div>
@@ -642,9 +673,31 @@
       <div class="screen" id="inbox-screen">
         <div class="inbox-tabs">
           <button class="inbox-tab active" data-inbox="interactions">interactions</button>
-          <button class="inbox-tab" data-inbox="follows">follows</button>
+          <button class="inbox-tab" data-inbox="following">following</button>
         </div>
         <div id="inbox-container"></div>
+      </div>
+
+      <div class="screen" id="user-profile-screen">
+        <div class="profile">
+          <button class="back-btn" onclick="goBack()" style="position:absolute;top:12px;left:12px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <div class="profile-avatar" id="user-profile-avatar">?</div>
+          <h2 class="profile-name" id="user-profile-name">author</h2>
+          <p class="profile-handle" id="user-profile-handle">@author</p>
+          <div class="profile-stats">
+            <div class="profile-stat">
+              <div class="profile-stat-value" id="user-stat-stories">0</div>
+              <div class="profile-stat-label">stories</div>
+            </div>
+            <div class="profile-stat">
+              <div class="profile-stat-value" id="user-stat-endings">0</div>
+              <div class="profile-stat-label">endings</div>
+            </div>
+          </div>
+        </div>
+        <div class="stories" id="user-stories-container"></div>
       </div>
 
       <div class="screen" id="profile-screen">
@@ -784,6 +837,7 @@
   <script>
     const SUPABASE_URL = 'https://pfvlmbgjjepbhbgsncgj.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_OKgbNNrKrNI9YG0SnuiyDQ_tPEF4ReY';
+    const OWNER_EMAIL = 'hackoili1998@gmail.com';
 
     let sb;
     try {
@@ -795,6 +849,9 @@
     let currentTab = 'unfinished';
     let currentStory = null;
     let allStories = [];
+    let searchQuery = '';
+    let userRoles = {};
+    let following = [];
 
     const $ = id => document.getElementById(id);
     const toast = $('toast');
@@ -808,6 +865,15 @@
 
     function getInitials(name) {
       return name ? name.substring(0, 2).toUpperCase() : '??';
+    }
+
+    function getBadge(authorId) {
+      const user = userRoles[authorId];
+      if (!user) return '';
+      if (user.email === OWNER_EMAIL) return ' 👑';
+      if (user.role === 'admin') return ' 🔨';
+      if (user.role === 'mod') return ' 🛡️';
+      return '';
     }
 
     function formatTime(ts) {
@@ -842,6 +908,13 @@
       if (route === 'story' && parts[1]) {
         closeAllModals();
         openStory(parts[1], false);
+        return;
+      }
+
+      if (route === 'user' && parts[1]) {
+        const userId = parts[1];
+        const userName = parts[2] || 'author';
+        viewUserProfile(userId, decodeURIComponent(userName));
         return;
       }
 
@@ -884,24 +957,59 @@
       const { data, error } = await sb.from('stories').select('*').order('created_at', { ascending: false });
       if (error) { container.innerHTML = `<div class="empty"><h3>error</h3><p>${error.message}</p></div>`; return; }
       allStories = data || [];
+      
+      // Load user roles for badges
+      const { data: profiles } = await sb.from('profiles').select('id, email, role');
+      if (profiles) {
+        profiles.forEach(p => { userRoles[p.id] = { role: p.role, email: p.email }; });
+      }
+      
       renderStories();
+    }
+
+    function highlightText(text, query) {
+      if (!query) return text;
+      const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+      return text.replace(regex, '<mark style="background:#ffd700;color:#000;padding:0 2px;border-radius:2px;">$1</mark>');
+    }
+
+    function getTotalReactions(story) {
+      const r = story.reactions || { heart: 0, fire: 0, scream: 0, laugh: 0, cry: 0 };
+      return r.heart + r.fire + r.scream + r.laugh + r.cry;
     }
 
     function renderStories() {
       const container = $('stories-container');
-      let stories = allStories;
+      let stories = [...allStories];
       if (currentTab === 'scary') stories = stories.filter(s => s.category === 'scary');
       else if (currentTab === 'unfinished') stories = stories.filter(s => !s.is_finished);
-      else stories = stories.filter(s => s.is_finished);
-      if (stories.length === 0) { container.innerHTML = '<div class="empty"><h3>no stories yet</h3><p>be the first to write one</p></div>'; return; }
+      else if (currentTab === 'finished') stories = stories.filter(s => s.is_finished);
+      else if (currentTab === 'trending') {
+        stories = allStories;
+      }
+      
+      if (currentTab === 'trending') {
+        stories.sort((a, b) => getTotalReactions(b) - getTotalReactions(a));
+      }
+      
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        stories = stories.filter(s => 
+          s.title.toLowerCase().includes(query) || 
+          s.author_name.toLowerCase().includes(query) ||
+          s.content.toLowerCase().includes(query)
+        );
+      }
+      
+      if (stories.length === 0) { container.innerHTML = '<div class="empty"><h3>no stories found</h3><p>try a different search</p></div>'; return; }
       container.innerHTML = stories.map(s => `
         <div class="story" onclick="openStory('${s.id}')">
           <div class="story-header">
             <div class="avatar">${getInitials(s.author_name)}</div>
-            <span class="author">${s.author_name}</span>
+            <span class="author" onclick="event.stopPropagation(); viewUserProfile('${s.author_id}', '${s.author_name}')" style="cursor:pointer;">${highlightText(s.author_name, searchQuery)}<span style="color:#ffd700;">${getBadge(s.author_id)}</span></span>
           </div>
-          <h3 class="title">${s.title}</h3>
-          <p class="preview">${s.content}</p>
+          <h3 class="title">${highlightText(s.title, searchQuery)}</h3>
+          <p class="preview">${highlightText(s.content, searchQuery)}</p>
           <div class="reactions">
             <button class="reaction" onclick="event.stopPropagation(); react('${s.id}', 'heart')">❤️ ${s.reactions?.heart || 0}</button>
             <button class="reaction" onclick="event.stopPropagation(); react('${s.id}', 'fire')">🔥 ${s.reactions?.fire || 0}</button>
@@ -913,6 +1021,83 @@
         </div>
       `).join('');
     }
+
+    async function viewUserProfile(userId, userName) {
+      window.location.hash = `/user/${userId}/${encodeURIComponent(userName)}`;
+      
+      const userStories = allStories.filter(s => s.author_id === userId);
+      const { data: comments } = await sb.from('comments').select('*').eq('author_id', userId).eq('is_story_ending', true);
+      const { data: profile } = await sb.from('profiles').select('*').eq('id', userId).single();
+      
+      $('user-profile-avatar').textContent = getInitials(userName);
+      $('user-profile-name').textContent = userName + getBadge(userId);
+      $('user-profile-handle').textContent = '@' + userName.toLowerCase().replace(/\s+/g, '_');
+      $('user-stat-stories').textContent = userStories.length;
+      $('user-stat-endings').textContent = comments?.length || 0;
+      
+      // Follow button
+      let isFollowing = false;
+      if (currentUser) {
+        const { data: myProfile } = await sb.from('profiles').select('following').eq('id', currentUser.id).single();
+        isFollowing = myProfile?.following?.includes(userId) || false;
+      }
+      const followBtn = userId !== currentUser?.id ? `<button class="btn" id="follow-btn" onclick="toggleFollow('${userId}')" style="margin:16px auto;max-width:200px;">${isFollowing ? 'unfollow' : 'follow'}</button>` : '';
+      
+      const container = $('user-stories-container');
+      if (userStories.length === 0) {
+        container.innerHTML = '<div class="empty"><h3>no stories yet</h3></div>';
+      } else {
+        container.innerHTML = userStories.map(s => `
+          <div class="story" onclick="openStory('${s.id}')">
+            <div class="story-header">
+              <div class="avatar">${getInitials(s.author_name)}</div>
+              <span class="author">${s.author_name}<span style="color:#ffd700;">${getBadge(s.author_id)}</span></span>
+            </div>
+            <h3 class="title">${s.title}</h3>
+            <p class="preview">${s.content}</p>
+            <div class="reactions">
+              <button class="reaction">❤️ ${s.reactions?.heart || 0}</button>
+              <button class="reaction">🔥 ${s.reactions?.fire || 0}</button>
+            </div>
+            <div class="stats">💬 ${s.comment_count || 0} comments</div>
+          </div>
+        `).join('');
+      }
+      
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      $('user-profile-screen').classList.add('active');
+      
+      const profileDiv = document.querySelector('#user-profile-screen .profile');
+      const existingBtn = profileDiv.querySelector('#follow-btn');
+      if (existingBtn) existingBtn.remove();
+      if (followBtn) profileDiv.insertAdjacentHTML('beforeend', followBtn);
+    }
+
+    async function toggleFollow(userId) {
+      if (!currentUser) { showLoginModal(); return; }
+      
+      const { data: myProfile } = await sb.from('profiles').select('following').eq('id', currentUser.id).single();
+      let following = myProfile?.following || [];
+      
+      if (following.includes(userId)) {
+        following = following.filter(id => id !== userId);
+      } else {
+        following.push(userId);
+      }
+      
+      await sb.from('profiles').update({ following }).eq('id', currentUser.id);
+      viewUserProfile(userId, allStories.find(s => s.author_id === userId)?.author_name || 'author');
+      showToast(following.includes(userId) ? 'followed!' : 'unfollowed');
+    }
+
+    function goBack() {
+      window.history.back();
+    }
+
+    $('search-input').addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      renderStories();
+    });
 
     async function openStory(id, updateHash = true) {
       const { data, error } = await sb.from('stories').select('*').eq('id', id).single();
@@ -928,7 +1113,7 @@
         <div class="story-header" style="margin-bottom:16px;">
           <div class="avatar" style="width:48px;height:48px;font-size:16px;">${getInitials(data.author_name)}</div>
           <div>
-            <div class="author">${data.author_name}</div>
+            <div class="author" style="cursor:pointer;" onclick="viewUserProfile('${data.author_id}', '${data.author_name}')">${data.author_name}<span style="color:#ffd700;">${getBadge(data.author_id)}</span></div>
             <div style="font-size:12px;color:var(--text-muted);">${formatTime(data.created_at)} ago</div>
           </div>
           ${canManage ? '<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;margin-left:auto;" onclick="deleteStory(\'' + id + '\')">delete</button>' : ''}
@@ -943,13 +1128,14 @@
           </div>
         </div>
         <div class="comments">
-          <h3 style="font-size:14px;font-weight:700;color:var(--text-secondary);margin-bottom:16px;">${comments.length} comments</h3>
+          <h3 style="font-size:14px;font-weight:700;color:var(--text-secondary);margin-bottom:16px;">${comments.length} endings</h3>
           ${comments.map(c => {
             const canDeleteComment = (currentUser && currentUser.id === c.author_id) || isAdmin();
             return `
             <div class="comment ${c.is_story_ending ? 'ending' : ''} ${c.is_pinned ? 'pinned' : ''}" id="comment-${c.id}">
               <div class="comment-header">
-                <span class="comment-author">${c.author_name}</span>
+                <span class="comment-author">${c.author_name}<span style="color:#ffd700;">${getBadge(c.author_id)}</span></span>
+                ${c.is_story_ending ? '<span style="color:#1d9bf0;font-size:11px;">(finished story)</span>' : ''}
                 ${c.is_pinned ? '<span style="color:#1d9bf0;font-size:11px;">📌 pinned</span>' : ''}
                 <span class="comment-time">${formatTime(c.created_at)}</span>
                 ${(isAuthor || isAdmin()) ? `<button class="pin-btn ${c.is_pinned ? 'pinned' : ''}" onclick="togglePin('${c.id}', ${!c.is_pinned})">${c.is_pinned ? 'unpin' : 'pin'}</button>` : ''}
@@ -1028,7 +1214,6 @@
       await sb.from('stories').update({ comment_count: (currentStory.comment_count || 0) + 1 }).eq('id', currentStory.id);
       closeFinishModal();
       showToast('your ending has been added!');
-      loadStories();
       openStory(currentStory.id);
     });
 
@@ -1091,7 +1276,7 @@
       const { data, error } = await sb.auth.signUp({ email, password });
       if (error) { $('signup-error').textContent = error.message; $('signup-error').style.display = 'block'; btn.disabled = false; btn.textContent = 'create account'; return; }
       if (data.user) {
-        await sb.from('profiles').insert({ id: data.user.id, name, email, created_at: new Date().toISOString() });
+        await sb.from('profiles').insert({ id: data.user.id, name, email, following: [], created_at: new Date().toISOString() });
         currentUser = { id: data.user.id, email, name };
         closeModals();
         showToast(`welcome, ${name}!`);
@@ -1368,21 +1553,66 @@
 
     async function loadInbox() {
       const container = $('inbox-container');
-      if (!currentUser) { container.innerHTML = '<div class="empty"><h3>sign in to see interactions</h3><p>interactions on your stories will appear here</p></div>'; return; }
+      const activeTab = document.querySelector('.inbox-tab.active')?.dataset.inbox || 'interactions';
+      
+      if (!currentUser) { container.innerHTML = '<div class="empty"><h3>sign in to see content</h3></div>'; return; }
+      
+      if (activeTab === 'following') {
+        const { data: profile } = await sb.from('profiles').select('following').eq('id', currentUser.id).single();
+        const followingIds = profile?.following || [];
+        
+        if (followingIds.length === 0) {
+          container.innerHTML = '<div class="empty"><h3>not following anyone</h3><p>visit an author profile to follow them</p></div>';
+          return;
+        }
+        
+        const followedStories = allStories.filter(s => followingIds.includes(s.author_id));
+        if (followedStories.length === 0) {
+          container.innerHTML = '<div class="empty"><h3>no stories from people you follow</h3></div>';
+          return;
+        }
+        
+        container.innerHTML = followedStories.map(s => `
+          <div class="story" onclick="openStory('${s.id}')">
+            <div class="story-header">
+              <div class="avatar">${getInitials(s.author_name)}</div>
+              <span class="author">${s.author_name}<span style="color:#ffd700;">${getBadge(s.author_id)}</span></span>
+            </div>
+            <h3 class="title">${s.title}</h3>
+            <p class="preview">${s.content}</p>
+            <div class="reactions">
+              <button class="reaction">❤️ ${s.reactions?.heart || 0}</button>
+              <button class="reaction">🔥 ${s.reactions?.fire || 0}</button>
+            </div>
+            <div class="stats">💬 ${s.comment_count || 0} comments</div>
+          </div>
+        `).join('');
+        return;
+      }
+      
+      // Interactions tab
       const myStoryIds = allStories.filter(s => s.author_id === currentUser.id).map(s => s.id);
       if (myStoryIds.length === 0) { container.innerHTML = '<div class="empty"><h3>no interactions yet</h3><p>publish stories to get interactions</p></div>'; return; }
       const { data } = await sb.from('comments').select('*').in('story_id', myStoryIds).order('created_at', { ascending: false }).limit(20);
       if (!data || data.length === 0) { container.innerHTML = '<div class="empty"><h3>no interactions yet</h3><p>interactions on your stories will appear here</p></div>'; return; }
       container.innerHTML = data.map(c => `
-        <div class="inbox-item">
+        <div class="inbox-item" onclick="openStory('${c.story_id}')" style="cursor:pointer;">
           <div class="avatar" style="width:44px;height:44px;font-size:14px;">${getInitials(c.author_name)}</div>
           <div class="inbox-content">
-            <p class="inbox-text"><strong>${c.author_name}</strong> ${c.is_story_ending ? 'finished your story' : 'commented on your story'}</p>
+            <p class="inbox-text"><strong>${c.author_name}<span style="color:#ffd700;">${getBadge(c.author_id)}</span></strong> ${c.is_story_ending ? 'finished your story' : 'commented on your story'}</p>
             <span class="inbox-time">${formatTime(c.created_at)} ago</span>
           </div>
         </div>
       `).join('');
     }
+
+    document.querySelectorAll('.inbox-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.inbox-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        loadInbox();
+      });
+    });
 
     if (sb) {
       loadStories();
