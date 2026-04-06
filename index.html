@@ -1002,14 +1002,15 @@
       }
       
       if (stories.length === 0) { container.innerHTML = '<div class="empty"><h3>no stories found</h3><p>try a different search</p></div>'; return; }
+      const isSearching = searchQuery.length > 0;
       container.innerHTML = stories.map(s => `
         <div class="story" onclick="openStory('${s.id}')">
           <div class="story-header">
             <div class="avatar">${getInitials(s.author_name)}</div>
-            <span class="author" onclick="event.stopPropagation(); viewUserProfile('${s.author_id}', '${s.author_name}')" style="cursor:pointer;">${highlightText(s.author_name, searchQuery)}<span style="color:#ffd700;">${getBadge(s.author_id)}</span></span>
+            <span class="author" onclick="event.stopPropagation(); viewUserProfile('${s.author_id}', '${s.author_name}')" style="cursor:pointer;">${isSearching ? highlightText(s.author_name, searchQuery) : s.author_name}<span style="color:#ffd700;">${getBadge(s.author_id)}</span></span>
           </div>
-          <h3 class="title">${highlightText(s.title, searchQuery)}</h3>
-          <p class="preview">${highlightText(s.content, searchQuery)}</p>
+          <h3 class="title">${isSearching ? highlightText(s.title, searchQuery) : s.title}</h3>
+          <p class="preview">${isSearching ? highlightText(s.content, searchQuery) : s.content}</p>
           <div class="reactions">
             <button class="reaction" onclick="event.stopPropagation(); react('${s.id}', 'heart')">❤️ ${s.reactions?.heart || 0}</button>
             <button class="reaction" onclick="event.stopPropagation(); react('${s.id}', 'fire')">🔥 ${s.reactions?.fire || 0}</button>
