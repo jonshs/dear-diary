@@ -967,6 +967,57 @@
   <div class="toast" id="toast"></div>
 
   <script>
+    const DRAFT_KEY = 'dear-diary-draft';
+
+    function saveDraft() {
+      if (!currentUser) return;
+      const draft = {
+        title: $('story-title').value,
+        content: $('story-content').value,
+        category: document.querySelector('.category.selected')?.dataset.category || 'unfinished',
+        timestamp: Date.now()
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }
+
+    function loadDraft() {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        try {
+          const draft = JSON.parse(saved);
+          if (Date.now() - draft.timestamp < 7 * 24 * 60 * 60 * 1000) {
+            $('story-title').value = draft.title || '';
+            $('story-content').value = draft.content || '';
+            document.querySelectorAll('.category').forEach(c => c.classList.remove('selected'));
+            const cat = document.querySelector(`.category[data-category="${draft.category}"]`);
+            if (cat) cat.classList.add('selected');
+            showToast('draft restored');
+          } else {
+            localStorage.removeItem(DRAFT_KEY);
+          }
+        } catch(e) {
+          localStorage.removeItem(DRAFT_KEY);
+        }
+      }
+    }
+
+    function clearDraft() {
+      localStorage.removeItem(DRAFT_KEY);
+    }
+
+    $('story-title').addEventListener('input', saveDraft);
+    $('story-content').addEventListener('input', saveDraft);
+    document.querySelectorAll('.category').forEach(c => c.addEventListener('click', saveDraft));
+
+    const writeObserver = new MutationObserver((mutations) => {
+      mutations.forEach((m) => {
+        if (m.target.classList.contains('active') && m.target.id === 'publish-screen') {
+          loadDraft();
+        }
+      });
+    });
+    writeObserver.observe($('publish-screen'), { attributes: true, attributeFilter: ['class'] });
+
     const SUPABASE_URL = 'https://pfvlmbgjjepbhbgsncgj.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_OKgbNNrKrNI9YG0SnuiyDQ_tPEF4ReY';
     const OWNER_EMAIL = 'hackoili1998@gmail.com';
@@ -1286,7 +1337,8 @@
             </div>
             <div class="comments-list" id="comments-list-${s.id}">
               ${(storyComments).slice(0, 5).map(c => {
-                const canDelete = (currentUser && currentUser.id === c.author_id) || isAdmin();
+                const canDelC = canDeleteComment(c);
+                const canEdC = canEditComment(c);
                 return `
                 <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
                   <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
@@ -1295,7 +1347,8 @@
                     </a>
                     <a href="#/user/${c.author_id}/${encodeURIComponent(c.author_name)}" class="comment-author" style="font-weight:600;font-size:12px;color:#e7e7e7;text-decoration:none;">${c.author_name}</a>
                     <span style="font-size:10px;color:#71767b;">${formatTime(c.created_at)}</span>
-                    ${canDelete ? `<button onclick="deleteCommentInline('${c.id}','${s.id}')" style="background:none;border:none;color:#dc3545;font-size:10px;cursor:pointer;margin-left:auto;">del</button>` : ''}
+                    ${canEdC ? `<button onclick="editCommentInline('${c.id}','${s.id}')" style="background:none;border:none;color:#198754;font-size:10px;cursor:pointer;">edit</button>` : ''}
+                    ${canDelC ? `<button onclick="deleteCommentInline('${c.id}','${s.id}')" style="background:none;border:none;color:#dc3545;font-size:10px;cursor:pointer;margin-left:auto;">del</button>` : ''}
                   </div>
                   <p style="font-size:14px;color:#ffffff;line-height:1.4;">${c.content}</p>
                   <button style="background:none;border:none;color:#1d9bf0;font-size:13px;cursor:pointer;padding:6px 8px;" onclick="showInlineReplyForm('${c.id}','${s.id}')">reply</button>
@@ -1449,13 +1502,15 @@
     function renderInlineRepliesRecursive(replies, storyId, depth) {
       if (!replies || depth > 3) return [''];
       return replies.map(r => {
-        const canDelete = (currentUser && currentUser.id === r.author_id) || isAdmin();
+        const canDelR = canDeleteReply(r);
+        const canEdR = canEditReply(r);
         return `
         <div style="padding:4px 0;">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
             <span style="font-weight:600;font-size:11px;color:#e7e7e7;">${r.author_name}</span>
             <span style="font-size:9px;color:#71767b;">${formatTime(r.created_at)}</span>
-            ${canDelete ? `<button onclick="deleteReplyInline('${r.id}','${storyId}')" style="background:none;border:none;color:#dc3545;font-size:9px;cursor:pointer;margin-left:auto;">del</button>` : ''}
+            ${canEdR ? `<button onclick="editReplyInline('${r.id}','${storyId}')" style="background:none;border:none;color:#198754;font-size:9px;cursor:pointer;">edit</button>` : ''}
+            ${canDelR ? `<button onclick="deleteReplyInline('${r.id}','${storyId}')" style="background:none;border:none;color:#dc3545;font-size:9px;cursor:pointer;margin-left:auto;">del</button>` : ''}
           </div>
           <p style="font-size:13px;color:#cccccc;line-height:1.3;">${r.content}</p>
           <button style="background:none;border:none;color:#1d9bf0;font-size:12px;cursor:pointer;padding:4px 6px;" onclick="showInlineReplyForm('${r.id}','${storyId}')">reply</button>
@@ -1472,6 +1527,10 @@
     }
 
     async function deleteCommentInline(commentId, storyId) {
+      if (!canDeleteComment({ id: commentId, author_id: allComments[storyId]?.find(c => c.id === commentId)?.author_id })) {
+        showToast('not allowed');
+        return;
+      }
       if (!confirm('delete this comment?')) return;
       await sb.from('comments').delete().eq('id', commentId);
       const story = allStories.find(s => s.id === storyId);
@@ -1483,20 +1542,68 @@
       renderStories();
     }
 
-    async function deleteReplyInline(replyId, storyId) {
-      if (!confirm('delete this reply?')) return;
+    async function editCommentInline(commentId, storyId) {
+      if (!canEditComment({ id: commentId, author_id: allComments[storyId]?.find(c => c.id === commentId)?.author_id })) {
+        showToast('not allowed');
+        return;
+      }
+      const comment = allComments[storyId]?.find(c => c.id === commentId);
+      if (!comment) return;
+      const newContent = prompt('edit comment:', comment.content);
+      if (newContent && newContent.trim() !== comment.content) {
+        await sb.from('comments').update({ content: newContent.trim() }).eq('id', commentId);
+        showToast('comment updated');
+        renderStories();
+      }
+    }
+
+    async function editReplyInline(replyId, storyId) {
       for (const comment of (allComments[storyId] || [])) {
-        if (comment.replies) {
-          const index = comment.replies.findIndex(r => r.id === replyId);
-          if (index !== -1) {
-            comment.replies.splice(index, 1);
-            await sb.from('comments').update({ replies: comment.replies }).eq('id', comment.id);
-            break;
+        const reply = findReplyById(comment.replies || [], replyId);
+        if (reply) {
+          if (!canEditComment(reply)) {
+            showToast('not allowed');
+            return;
           }
+          const newContent = prompt('edit reply:', reply.content);
+          if (newContent && newContent.trim() !== reply.content) {
+            reply.content = newContent.trim();
+            await sb.from('comments').update({ replies: comment.replies }).eq('id', comment.id);
+            showToast('reply updated');
+            renderStories();
+          }
+          return;
         }
       }
-      showToast('reply deleted');
-      renderStories();
+    }
+
+    function findReplyById(replies, replyId) {
+      for (const r of replies) {
+        if (r.id === replyId) return r;
+        if (r.replies && r.replies.length > 0) {
+          const found = findReplyById(r.replies, replyId);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    async function deleteReplyInline(replyId, storyId) {
+      for (const comment of (allComments[storyId] || [])) {
+        const reply = findReplyById(comment.replies || [], replyId);
+        if (reply) {
+          if (!canDeleteComment(reply)) {
+            showToast('not allowed');
+            return;
+          }
+          if (!confirm('delete this reply?')) return;
+          removeReplyRecursive(comment.replies, replyId);
+          await sb.from('comments').update({ replies: comment.replies }).eq('id', comment.id);
+          showToast('reply deleted');
+          renderStories();
+          return;
+        }
+      }
     }
 
     async function toggleLike(storyId) {
@@ -1838,7 +1945,8 @@
       let comments = commentsRes.data || [];
       comments.sort((a, b) => { if (a.is_pinned && !b.is_pinned) return -1; if (!a.is_pinned && b.is_pinned) return 1; return (b.likes || 0) - (a.likes || 0); });
       const isAuthor = currentUser && currentUser.id === data.author_id;
-      const canManage = isAuthor || isAdmin();
+      const canDelete = canDeleteStory(data);
+      const canEdit = canEditStory(data);
       $('story-detail').innerHTML = `
         <div class="story-header" style="margin-bottom:16px;">
           <div class="avatar" style="width:48px;height:48px;font-size:16px;">${getInitials(data.author_name)}</div>
@@ -1846,7 +1954,10 @@
             <div class="author" style="cursor:pointer;" onclick="viewUserProfile('${data.author_id}', '${data.author_name}')">${data.author_name}<span style="color:#ffd700;">${getBadge(data.author_id)}</span></div>
             <div style="font-size:12px;color:var(--text-muted);">${formatTime(data.created_at)} ago</div>
           </div>
-          ${canManage ? '<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;margin-left:auto;" onclick="deleteStory(\'' + id + '\')">delete</button>' : ''}
+          <div style="display:flex;gap:6px;margin-left:auto;">
+            ${canEdit ? '<button class="pin-btn" style="background:#198754;color:#fff;border-color:#198754;" onclick="editStoryInline(\'' + id + '\')">edit</button>' : ''}
+            ${canDelete ? '<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;" onclick="deleteStory(\'' + id + '\')">delete</button>' : ''}
+          </div>
         </div>
         <h1 style="font-size:20px;margin-bottom:8px;">${data.title}</h1>
         <div class="story-body">${data.content}</div>
@@ -1876,7 +1987,8 @@
           </div>
           
           ${comments.map(c => {
-            const canDeleteComment = (currentUser && currentUser.id === c.author_id) || isAdmin();
+            const canDelComment = canDeleteComment(c);
+            const canEdComment = canEditComment(c);
             const replies = c.replies || [];
             return `
             <div class="comment ${c.is_story_ending ? 'ending' : ''} ${c.is_pinned ? 'pinned' : ''}" id="comment-${c.id}" style="margin-bottom:16px;">
@@ -1886,7 +1998,8 @@
                 ${c.is_pinned ? '<span style="color:#1d9bf0;font-size:11px;">📌</span>' : ''}
                 <span class="comment-time">${formatTime(c.created_at)}</span>
                 ${(isAuthor || isAdmin()) ? `<button class="pin-btn ${c.is_pinned ? 'pinned' : ''}" onclick="togglePin('${c.id}', ${!c.is_pinned})">${c.is_pinned ? 'unpin' : 'pin'}</button>` : ''}
-                ${canDeleteComment ? `<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;" onclick="deleteComment('${c.id}', '${id}')">del</button>` : ''}
+                ${canEdComment ? `<button class="pin-btn" style="background:#198754;color:#fff;border-color:#198754;" onclick="editCommentInline('${c.id}', '${id}')">edit</button>` : ''}
+                ${canDelComment ? `<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;" onclick="deleteComment('${c.id}', '${id}')">del</button>` : ''}
               </div>
               <p class="comment-text">${c.content}</p>
               <button class="reply-btn" onclick="showReplyForm('${c.id}')">reply</button>
@@ -1906,6 +2019,10 @@
     }
 
     async function togglePin(commentId, pin) {
+      if (!currentUser || !isAdmin()) {
+        showToast('not allowed');
+        return;
+      }
       await sb.from('comments').update({ is_pinned: pin }).eq('id', commentId);
       if (currentStory) openStory(currentStory.id);
     }
@@ -1965,13 +2082,15 @@
     
     function renderReplyRecursive(reply, storyId, depth) {
       const nestedReplies = reply.replies || [];
-      const canDelete = (currentUser && currentUser.id === reply.author_id) || isAdmin();
+      const canDelReply = canDeleteReply(reply);
+      const canEdReply = canEditReply(reply);
       let html = `
         <div class="comment-reply" style="margin-top:8px;margin-left:${Math.min(depth * 12, 48)}px;">
           <div class="comment-header">
             <span class="comment-author">${reply.author_name}<span style="color:#ffd700;">${getBadge(reply.author_id)}</span></span>
             <span class="comment-time">${formatTime(reply.created_at)}</span>
-            ${canDelete ? `<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;padding:2px 6px;font-size:10px;" onclick="deleteReply('${reply.id}', '${storyId}')">del</button>` : ''}
+            ${canEdReply ? `<button class="pin-btn" style="background:#198754;color:#fff;border-color:#198754;padding:2px 6px;font-size:10px;" onclick="editReplyInline('${reply.id}', '${storyId}')">edit</button>` : ''}
+            ${canDelReply ? `<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;padding:2px 6px;font-size:10px;" onclick="deleteReply('${reply.id}', '${storyId}')">del</button>` : ''}
           </div>
           <p class="comment-text">${reply.content}</p>
           <button class="reply-btn" onclick="showReplyForm('reply-${reply.id}')">reply</button>
@@ -2035,10 +2154,24 @@
     }
     
     async function deleteReply(replyId, storyId) {
+      const reply = findReplyByIdInComments(storyId, replyId);
+      if (!reply) return;
+      if (!canDeleteComment(reply)) {
+        showToast('not allowed');
+        return;
+      }
       if (!confirm('delete this reply?')) return;
       await removeReplyFromComments(storyId, replyId);
       showToast('reply deleted');
       openStory(storyId, false);
+    }
+
+    function findReplyByIdInComments(storyId, replyId) {
+      for (const comment of (allComments[storyId] || [])) {
+        const found = findReplyById(comment.replies || [], replyId);
+        if (found) return found;
+      }
+      return null;
     }
     
     async function removeReplyFromComments(storyId, replyId) {
@@ -2211,6 +2344,77 @@
 
     function isAdmin() { return currentUserRole === 'admin' || currentUserRole === 'mod'; }
 
+    function isOwner() { return currentUser?.email === OWNER_EMAIL; }
+
+    function canEditStory(story) {
+      if (!currentUser) return false;
+      if (currentUser.id === story.author_id) return true;
+      if (isAdmin() || isOwner()) return true;
+      return false;
+    }
+
+    function canDeleteStory(story) {
+      if (!currentUser) return false;
+      if (currentUser.id === story.author_id) return true;
+      if (isAdmin() || isOwner()) return true;
+      return false;
+    }
+
+    function canEditComment(comment) {
+      if (!currentUser) return false;
+      if (currentUser.id === comment.author_id) return true;
+      if (isAdmin() || isOwner()) return true;
+      return false;
+    }
+
+    function canDeleteComment(comment) {
+      if (!currentUser) return false;
+      if (currentUser.id === comment.author_id) return true;
+      if (isAdmin() || isOwner()) return true;
+      return false;
+    }
+
+    function canDeleteStory(story) {
+      if (!currentUser) return false;
+      if (currentUser.id === story.author_id) return true;
+      if (isAdmin() || isOwner()) return true;
+      return false;
+    }
+
+    function canEditComment(comment) {
+      if (!currentUser) return false;
+      if (currentUser.id === comment.author_id) return true;
+      if (isAdmin() || isOwner()) return true;
+      return false;
+    }
+
+    function canDeleteComment(comment) {
+      if (!currentUser) return false;
+      if (currentUser.id === comment.author_id) return true;
+      if (isAdmin() || isOwner()) return true;
+      return false;
+    }
+
+    function canEditReply(reply) {
+      if (!currentUser) return false;
+      if (currentUser.id === reply.author_id) return true;
+      if (isAdmin() || isOwner()) return true;
+      return false;
+    }
+
+    function canDeleteReply(reply) {
+      if (!currentUser) return false;
+      if (currentUser.id === reply.author_id) return true;
+      if (isAdmin() || isOwner()) return true;
+      return false;
+    }
+
+    function canPinComment(comment) {
+      if (!currentUser) return false;
+      if (isAdmin()) return true;
+      return false;
+    }
+
     async function updateAdminButton() {
       const btn = document.querySelector('.admin-nav-btn');
       if (!btn) return;
@@ -2222,6 +2426,11 @@
     }
 
     async function deleteStory(id) {
+      const story = allStories.find(s => s.id === id) || currentStory;
+      if (!canDeleteStory(story)) {
+        showToast('not allowed');
+        return;
+      }
       if (!confirm('delete this story?')) return;
       await sb.from('stories').delete().eq('id', id);
       showToast('story deleted');
@@ -2229,7 +2438,29 @@
       loadStories();
     }
 
+    async function editStoryInline(id) {
+      const story = allStories.find(s => s.id === id) || currentStory;
+      if (!canEditStory(story)) {
+        showToast('not allowed');
+        return;
+      }
+      const newTitle = prompt('edit title:', story.title);
+      if (newTitle === null) return;
+      const newContent = prompt('edit content:', story.content);
+      if (newContent === null) return;
+      if (newTitle.trim() !== story.title || newContent.trim() !== story.content) {
+        await sb.from('stories').update({ title: newTitle.trim(), content: newContent.trim() }).eq('id', id);
+        showToast('story updated');
+        openStory(id, false);
+        loadStories();
+      }
+    }
+
     async function deleteComment(id, storyId) {
+      if (!canDeleteComment({ id, author_id: currentStory?.author_id })) {
+        showToast('not allowed');
+        return;
+      }
       if (!confirm('delete this comment?')) return;
       await sb.from('comments').delete().eq('id', id);
       openStory(storyId);
@@ -2545,6 +2776,10 @@
     }
     
     async function toggleVerify(userId, verify) {
+      if (!currentUser || !isAdmin()) {
+        showToast('not allowed');
+        return;
+      }
       await sb.from('profiles').update({ verified: verify }).eq('id', userId);
       showToast(verify ? 'user verified' : 'verification revoked');
       loadVerifyUsers();
@@ -2624,6 +2859,10 @@
     }
 
     async function changeUserRole(userId, newRole) {
+      if (!currentUser || currentUserRole !== 'admin') {
+        showToast('not allowed');
+        return;
+      }
       await sb.from('profiles').update({ role: newRole }).eq('id', userId);
       
       // Update local userRoles cache
@@ -2643,6 +2882,10 @@
     }
 
     async function editUserProfile(userId) {
+      if (!currentUser || !isAdmin()) {
+        showToast('not allowed');
+        return;
+      }
       const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
       if (!data) return;
       const newName = prompt('edit display name:', data.name);
@@ -2656,6 +2899,10 @@
     }
 
     async function deleteUser(userId, userName) {
+      if (!currentUser || !isAdmin()) {
+        showToast('not allowed');
+        return;
+      }
       if (!confirm(`delete user "${userName}" and all their content?`)) return;
       await sb.from('comments').delete().eq('author_id', userId);
       await sb.from('stories').delete().eq('author_id', userId);
@@ -2667,12 +2914,18 @@
     }
 
     async function editStory(storyId) {
+      if (!currentUser || !isAdmin()) {
+        showToast('not allowed');
+        return;
+      }
       const { data } = await sb.from('stories').select('*').eq('id', storyId).single();
       if (!data) return;
       const newTitle = prompt('edit title:', data.title);
+      if (newTitle === null) return;
       const newContent = prompt('edit content:', data.content);
-      if (newTitle && newContent && (newTitle !== data.title || newContent !== data.content)) {
-        await sb.from('stories').update({ title: newTitle, content: newContent }).eq('id', storyId);
+      if (newContent === null) return;
+      if (newTitle.trim() !== data.title || newContent.trim() !== data.content) {
+        await sb.from('stories').update({ title: newTitle.trim(), content: newContent.trim() }).eq('id', storyId);
         showToast('story updated');
         loadAllStories();
         loadStories();
@@ -2680,6 +2933,10 @@
     }
 
     async function pinStory(storyId, shouldFinish) {
+      if (!currentUser || !isAdmin()) {
+        showToast('not allowed');
+        return;
+      }
       await sb.from('stories').update({ is_finished: shouldFinish }).eq('id', storyId);
       showToast(shouldFinish ? 'story marked as finished' : 'story marked as unfinished');
       loadAllStories();
@@ -2687,6 +2944,10 @@
     }
 
     async function deleteStoryAdmin(storyId) {
+      if (!currentUser || !isAdmin()) {
+        showToast('not allowed');
+        return;
+      }
       if (!confirm('delete this story?')) return;
       await sb.from('comments').delete().eq('story_id', storyId);
       await sb.from('stories').delete().eq('id', storyId);
