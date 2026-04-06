@@ -589,7 +589,7 @@
   <div class="app">
     <header class="header">
       <div class="header-content">
-        <span class="logo">dear diary</span>
+        <a href="#/feed" class="logo" style="text-decoration:none;color:inherit;cursor:pointer;">dear diary</a>
         <button class="theme-btn" id="theme-toggle" title="Toggle theme">
           <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
           <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -822,14 +822,34 @@
       return `${days}d`;
     }
 
-    function goToScreen(screen) {
+    function goToScreen(screen, updateHash = true) {
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.querySelector(`.nav-btn[data-screen="${screen}"]`).classList.add('active');
       $(`${screen}-screen`).classList.add('active');
       if (screen === 'inbox') loadInbox();
       if (screen === 'profile') updateProfile();
+      if (updateHash) window.location.hash = `/${screen}`;
     }
+
+    function handleRoute() {
+      const hash = window.location.hash.slice(1) || '/feed';
+      const parts = hash.split('/').filter(Boolean);
+      const route = parts[0] || 'feed';
+
+      const screenMap = { 'feed': 'feed', 'write': 'publish', 'inbox': 'inbox', 'profile': 'profile' };
+
+      if (route === 'story' && parts[1]) {
+        closeAllModals();
+        openStory(parts[1], false);
+        return;
+      }
+
+      const screen = screenMap[route] || 'feed';
+      goToScreen(screen, false);
+    }
+
+    window.addEventListener('hashchange', handleRoute);
 
     function closeAllModals() {
       modalOverlay.classList.remove('active');
@@ -894,9 +914,10 @@
       `).join('');
     }
 
-    async function openStory(id) {
+    async function openStory(id, updateHash = true) {
       const { data, error } = await sb.from('stories').select('*').eq('id', id).single();
       if (error || !data) return;
+      if (updateHash) window.location.hash = `/story/${id}`;
       currentStory = data;
       const commentsRes = await sb.from('comments').select('*').eq('story_id', id).order('created_at', { ascending: false });
       let comments = commentsRes.data || [];
@@ -949,6 +970,7 @@
 
     $('story-back').addEventListener('click', () => {
       closeAllModals();
+      window.history.back();
     });
 
     async function react(storyId, type) {
@@ -1375,6 +1397,8 @@
     } else {
       $('stories-container').innerHTML = '<div class="empty"><h3>supabase not connected</h3><p>check browser console for errors</p></div>';
     }
+
+    handleRoute();
   </script>
 </body>
 </html>
