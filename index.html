@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dear diary</title>
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&family=Montserrat+Alternates:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Raleway', sans-serif;
+      background: #000;
+      color: #e7e7e7;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+    .app {
+      width: 100%;
+      max-width: 430px;
+      min-height: 100vh;
+      position: relative;
+      border-left: 1px solid rgba(255,255,255,0.07);
+      border-right: 1px solid rgba(255,255,255,0.07);
+    }
+    .header {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      height: 56px;
+      background: #000;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      z-index: 100;
+    }
+    .logo {
+      font-family: 'Montserrat Alternates', sans-serif;
+      font-size: 26px;
+      font-weight: 700;
+    }
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+    .main {
+      padding-top: 56px;
+      padding-bottom: 80px;
+      min-height: 100vh;
+    }
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      position: sticky;
+      top: 56px;
+      background: #000;
+      z-index: 10;
+    }
+    .tab {
+      flex: 1;
+      padding: 14px;
+      background: none;
+      border: none;
+      color: #71767b;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      position: relative;
+    }
+    .tab.active { color: #e7e7e7; }
+    .tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 36px;
+      height: 3px;
+      background: #1d9bf0;
+      border-radius: 3px;
+    }
+    .stories { padding: 16px; }
+    .story {
+      padding: 16px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      cursor: pointer;
+    }
+    .story-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #1f1f1f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+      color: #1d9bf0;
+    }
+    .author { font-weight: 600; font-size: 14px; }
+    .title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .preview {
+      font-size: 14px;
+      color: #71767b;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .reactions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .reaction {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      background: #121212;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 20px;
+      font-size: 13px;
+      color: #71767b;
+      cursor: pointer;
+    }
+    .reaction:hover { background: #1f1f1f; }
+    .reaction.active { border-color: #1d9bf0; color: #1d9bf0; }
+    .stats { font-size: 13px; color: #71767b; }
+    .empty {
+      text-align: center;
+      padding: 64px 24px;
+      color: #71767b;
+    }
+    .empty h3 { font-size: 16px; color: #e7e7e7; margin-bottom: 8px; }
+    .nav {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      height: 64px;
+      background: #000;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 100;
+    }
+    .nav-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      background: none;
+      border: none;
+      color: #71767b;
+      cursor: pointer;
+      padding: 8px;
+    }
+    .nav-btn.active { color: #e7e7e7; }
+    .nav-btn svg { width: 24px; height: 24px; }
+    .nav-btn span { font-size: 10px; }
+    .publish-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #e7e7e7;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .publish-btn svg { width: 20px; height: 20px; color: #000; }
+    .nav-divider { display: none; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 2000;
+      display: none;
+    }
+    .modal-overlay.active { display: block; }
+    .modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: calc(100% - 48px);
+      max-width: 340px;
+      background: #121212;
+      border-radius: 16px;
+      padding: 28px 24px;
+      z-index: 2001;
+      display: none;
+    }
+    .modal.active { display: block; }
+    .modal h2 { font-size: 20px; text-align: center; margin-bottom: 6px; }
+    .modal p { text-align: center; color: #71767b; font-size: 14px; margin-bottom: 20px; }
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; color: #71767b; margin-bottom: 6px; }
+    .form-input {
+      width: 100%;
+      padding: 12px 14px;
+      background: #1f1f1f;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      color: #e7e7e7;
+      font-size: 15px;
+      font-family: inherit;
+    }
+    .form-input:focus { outline: none; border-color: #1d9bf0; }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: #1d9bf0;
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn:hover { background: #1a8cd8; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .switch { text-align: center; margin-top: 16px; font-size: 14px; color: #71767b; }
+    .switch a { color: #1d9bf0; cursor: pointer; }
+    .dismiss { width: 100%; padding: 12px; background: none; border: none; color: #536471; font-size: 14px; cursor: pointer; margin-top: 8px; font-family: inherit; }
+    .error { color: #f4212e; font-size: 12px; margin-top: 4px; display: none; }
+    .story-modal {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%) translateY(100%);
+      width: 100%;
+      max-width: 430px;
+      background: #000;
+      z-index: 2001;
+      transition: transform 0.3s;
+      overflow-y: auto;
+      display: none;
+    }
+    .story-modal.active { transform: translateX(-50%) translateY(0); display: block; }
+    .story-modal-header {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      position: sticky;
+      top: 0;
+      background: #000;
+    }
+    .back-btn {
+      width: 36px;
+      height: 36px;
+      background: none;
+      border: none;
+      color: #e7e7e7;
+      cursor: pointer;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .back-btn:hover { background: #121212; }
+    .modal-title { flex: 1; text-align: center; font-weight: 700; font-size: 16px; }
+    .story-content { padding: 16px; }
+    .story-body { font-size: 18px; line-height: 1.8; color: #e7e7e7; white-space: pre-wrap; margin-bottom: 16px; }
+    .comments { padding: 16px; border-top: 1px solid rgba(255,255,255,0.07); }
+    .comment { padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .comment-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .comment-author { font-weight: 600; font-size: 13px; }
+    .comment-time { font-size: 11px; color: #536471; }
+    .comment-text { font-size: 14px; color: #71767b; }
+    .comment.ending { background: rgba(29,155,240,0.08); padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+    .comment.ending::before { content: 'finished this story - '; color: #1d9bf0; font-size: 11px; }
+    .comment.pinned { background: rgba(29,155,240,0.1); border: 1px solid rgba(29,155,240,0.3); padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+    .sticky-reactions {
+      position: sticky;
+      bottom: 0;
+      background: #000;
+      padding: 12px 0;
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: #1f1f1f;
+      color: #e7e7e7;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      z-index: 3000;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .profile { padding: 24px 16px; text-align: center; }
+    .profile-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #1f1f1f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 700;
+      color: #1d9bf0;
+      margin: 0 auto 12px;
+    }
+    .profile-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .profile-handle { color: #71767b; font-size: 14px; }
+    .profile-stats {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 20px;
+      padding: 16px;
+      background: #121212;
+      border-radius: 12px;
+    }
+    .profile-stat { text-align: center; }
+    .profile-stat-value { font-size: 16px; font-weight: 700; }
+    .profile-stat-label { font-size: 12px; color: #71767b; }
+    .logout-btn {
+      display: block;
+      width: calc(100% - 32px);
+      margin: 24px 16px;
+      padding: 12px;
+      background: #121212;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      color: #e7e7e7;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .publish-screen { padding: 16px; }
+    .publish-header { margin-bottom: 24px; }
+    .publish-header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .publish-header p { color: #71767b; font-size: 14px; }
+    .category-selector { display: flex; gap: 10px; margin-bottom: 20px; }
+    .category {
+      flex: 1;
+      padding: 14px;
+      background: #121212;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .category.selected { border-color: #1d9bf0; background: rgba(29,155,240,0.1); }
+    .category h4 { font-size: 14px; margin-bottom: 2px; }
+    .category p { font-size: 12px; color: #536471; }
+    textarea.form-input { min-height: 180px; resize: vertical; line-height: 1.6; }
+    .inbox-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .inbox-tab {
+      flex: 1;
+      padding: 14px;
+      background: none;
+      border: none;
+      color: #71767b;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .inbox-tab.active { color: #e7e7e7; }
+    .inbox-tab.active::after { content: ''; display: block; height: 2px; background: #1d9bf0; margin-top: 12px; }
+    .inbox-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .inbox-content { flex: 1; }
+    .inbox-text { font-size: 14px; margin-bottom: 2px; }
+    .inbox-text strong { font-weight: 600; }
+    .inbox-time { font-size: 12px; color: #536471; }
+    .loading { display: flex; justify-content: center; padding: 48px; }
+    .spinner { width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.07); border-top-color: #1d9bf0; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .finish-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 12px;
+      margin-top: 12px;
+      background: #121212;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      color: #e7e7e7;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .finish-btn:hover { background: #1f1f1f; }
+    .finish-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.9);
+      z-index: 2500;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .finish-modal.active { display: flex; }
+    .finish-modal-content {
+      width: 100%;
+      max-width: 430px;
+      background: #121212;
+      border-radius: 16px 16px 0 0;
+      padding: 20px;
+      transform: translateY(100%);
+      transition: transform 0.3s;
+    }
+    .finish-modal.active .finish-modal-content { transform: translateY(0); }
+    .finish-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .finish-modal-header h3 { font-size: 16px; font-weight: 700; }
+    .finish-modal-close {
+      background: none;
+      border: none;
+      color: #71767b;
+      cursor: pointer;
+      padding: 4px;
+      font-size: 20px;
+      line-height: 1;
+    }
+    .finish-modal-close:hover { color: #e7e7e7; }
+    .finish-modal .hint { font-size: 13px; color: #71767b; margin-bottom: 16px; }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .btn-cancel {
+      flex: 1;
+      padding: 12px;
+      background: #1f1f1f;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      color: #71767b;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-submit {
+      flex: 1;
+      padding: 12px;
+      background: #198754;
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .pin-btn {
+      padding: 4px 8px;
+      background: #1f1f1f;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 6px;
+      color: #71767b;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .pin-btn:hover { background: #2a2a2a; }
+    .pin-btn.pinned { background: #1d9bf0; border-color: #1d9bf0; color: #fff; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    .theme-btn {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #71767b;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+    }
+    .theme-btn:hover { background: #121212; color: #e7e7e7; }
+    .theme-btn svg { width: 20px; height: 20px; }
+
+    :root {
+      --bg-primary: #000;
+      --bg-secondary: #121212;
+      --bg-tertiary: #1f1f1f;
+      --text-primary: #e7e7e7;
+      --text-secondary: #71767b;
+      --text-muted: #536471;
+      --border-color: rgba(255,255,255,0.07);
+    }
+    [data-theme="light"] {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f7f7f7;
+      --bg-tertiary: #eeeeee;
+      --text-primary: #0f0f0f;
+      --text-secondary: #536471;
+      --text-muted: #71767b;
+      --border-color: rgba(0,0,0,0.1);
+    }
+    body, .app, .header, .tabs, .story, .nav, .main, .story-modal, .finish-modal, .finish-modal-content,
+    .header, .tabs, .story, .nav, .main, .inbox-item { background-color: var(--bg-primary) !important; color: var(--text-primary) !important; }
+    .story:hover, .inbox-item:hover, .nav-btn:hover { background-color: var(--bg-tertiary) !important; }
+    [data-theme="light"] .story, [data-theme="light"] .inbox-item { border-color: var(--border-color) !important; }
+    [data-theme="light"] .header, [data-theme="light"] .tabs, [data-theme="light"] .nav { border-color: var(--border-color) !important; }
+
+    @media (min-width: 768px) {
+      .app { max-width: 100%; display: flex; border: none; }
+      .header {
+        position: relative; transform: none; left: 0; width: 280px; height: 100vh; max-width: none;
+        border-right: 1px solid rgba(255,255,255,0.07); border-bottom: none; flex-shrink: 0;
+        padding-top: 20px; padding-bottom: 20px; flex-direction: column; align-items: stretch;
+      }
+      .logo { font-size: 32px; margin-bottom: 40px; }
+      .nav {
+        position: relative; transform: none; left: 0; width: 280px; height: auto; max-width: none;
+        flex-direction: column; justify-content: flex-start; border-top: none; border-right: 1px solid rgba(255,255,255,0.07);
+        padding: 20px 0; gap: 8px;
+      }
+      .nav-btn { flex-direction: row; justify-content: flex-start; padding: 12px 20px; border-radius: 12px; gap: 12px; }
+      .nav-btn span { font-size: 15px; }
+      .nav-btn.active { background: rgba(29,155,240,0.1); }
+      .nav-divider { display: block; height: 1px; background: rgba(255,255,255,0.07); margin: 10px 0; }
+      .main { flex: 1; padding-top: 0; padding-bottom: 0; display: flex; flex-direction: column; max-width: 800px; }
+      .feed-screen { padding: 0 40px; }
+      .tabs { position: relative; top: 0; padding-top: 20px; justify-content: flex-start; gap: 24px; border-bottom: none; }
+      .tab { padding: 8px 0; font-size: 15px; }
+      .tab.active::after { width: 100%; height: 2px; bottom: -8px; }
+      .stories { max-width: 600px; }
+      .story { background: #0a0a0a; border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; margin-bottom: 16px; }
+      .story:hover { border-color: rgba(255,255,255,0.1); }
+      .publish-screen { padding: 40px; max-width: 600px; }
+      .publish-header h1 { font-size: 28px; }
+      .profile-screen { padding: 40px; }
+      .profile-avatar { width: 100px; height: 100px; font-size: 36px; }
+      .profile-name { font-size: 24px; }
+      .profile-stats { gap: 40px; padding: 24px 40px; }
+      .profile-stat-value { font-size: 20px; }
+      .inbox-screen { padding: 0 40px; }
+      .story-modal {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 100%; max-width: 700px; height: 80vh; border-radius: 20px;
+        border: 1px solid rgba(255,255,255,0.1);
+      }
+      .story-modal.active { transform: translate(-50%, -50%); }
+      .story-modal-header { border-radius: 20px 20px 0 0; }
+      .finish-modal { align-items: center; }
+      .finish-modal-content { border-radius: 20px; max-width: 500px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-content">
+        <span class="logo">dear diary</span>
+        <button class="theme-btn" id="theme-toggle" title="Toggle theme">
+          <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="screen active" id="feed-screen">
+        <div class="tabs">
+          <button class="tab active" data-tab="unfinished">unfinished</button>
+          <button class="tab" data-tab="scary">scary</button>
+          <button class="tab" data-tab="finished">finished</button>
+        </div>
+        <div class="stories" id="stories-container"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+
+      <div class="screen" id="publish-screen">
+        <div class="publish-screen">
+          <div class="publish-header">
+            <h1>write a story</h1>
+            <p>share your words with the world</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">title</label>
+            <input type="text" class="form-input" id="story-title" placeholder="give your story a title...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">category</label>
+            <div class="category-selector">
+              <div class="category selected" data-category="unfinished">
+                <h4>unfinished</h4><p>let others finish it</p>
+              </div>
+              <div class="category" data-category="scary">
+                <h4>scary</h4><p>horror & creepy</p>
+              </div>
+              <div class="category" data-category="finished">
+                <h4>finished</h4><p>a complete story</p>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">your story</label>
+            <textarea class="form-input" id="story-content" placeholder="begin writing..."></textarea>
+          </div>
+          <button class="btn" id="publish-submit">publish</button>
+        </div>
+      </div>
+
+      <div class="screen" id="inbox-screen">
+        <div class="inbox-tabs">
+          <button class="inbox-tab active" data-inbox="interactions">interactions</button>
+          <button class="inbox-tab" data-inbox="follows">follows</button>
+        </div>
+        <div id="inbox-container"></div>
+      </div>
+
+      <div class="screen" id="profile-screen">
+        <div class="profile">
+          <div class="profile-avatar" id="profile-avatar">?</div>
+          <h2 class="profile-name" id="profile-name">guest</h2>
+          <p class="profile-handle" id="profile-handle">@guest</p>
+          <div class="profile-stats">
+            <div class="profile-stat">
+              <div class="profile-stat-value" id="stat-stories">0</div>
+              <div class="profile-stat-label">stories</div>
+            </div>
+            <div class="profile-stat">
+              <div class="profile-stat-value" id="stat-followers">0</div>
+              <div class="profile-stat-label">followers</div>
+            </div>
+            <div class="profile-stat">
+              <div class="profile-stat-value" id="stat-following">0</div>
+              <div class="profile-stat-label">following</div>
+            </div>
+          </div>
+
+          <div id="edit-profile-section" style="display:none;margin-top:24px;padding:16px;background:var(--bg-secondary);border-radius:12px;">
+            <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;">edit profile</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <input type="text" class="form-input" id="edit-display-name" placeholder="display name" style="font-size:13px;">
+              <button class="btn" onclick="saveProfile()" style="padding:10px;font-size:13px;">save changes</button>
+              <button class="dismiss" onclick="document.getElementById('edit-profile-section').style.display='none';" style="margin-top:0;">cancel</button>
+            </div>
+          </div>
+
+          <div id="admin-panel" style="display:none;margin-top:24px;padding:16px;background:var(--bg-secondary);border-radius:12px;">
+            <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;">admin panel</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <button class="btn" onclick="showAdminSection('users')" style="padding:10px;font-size:13px;">manage users</button>
+              <button class="btn" onclick="showAdminSection('stories')" style="padding:10px;font-size:13px;background:#198754;">manage stories</button>
+              <button class="btn" onclick="showAdminSection('all')" style="padding:10px;font-size:13px;background:#6f42c1;">view all activity</button>
+            </div>
+            <div id="admin-results" style="margin-top:16px;"></div>
+          </div>
+
+          <button class="logout-btn" id="logout-btn" style="display:none;">log out</button>
+          <button class="logout-btn" id="login-btn">sign in</button>
+        </div>
+      </div>
+    </main>
+
+    <nav class="nav">
+      <button class="nav-btn active" data-screen="feed">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+        <span>feed</span>
+      </button>
+      <button class="nav-btn" data-screen="publish">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        <span>write</span>
+      </button>
+      <div class="nav-divider"></div>
+      <button class="nav-btn" data-screen="inbox">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <span>inbox</span>
+      </button>
+      <button class="nav-btn" data-screen="profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span>profile</span>
+      </button>
+    </nav>
+  </div>
+
+  <div class="modal-overlay" id="modal-overlay"></div>
+
+  <div class="modal" id="signup-modal">
+    <h2>create account</h2>
+    <p>join the community of storytellers</p>
+    <div class="form-group">
+      <label class="form-label">display name</label>
+      <input type="text" class="form-input" id="signup-name" placeholder="your name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">email</label>
+      <input type="email" class="form-input" id="signup-email" placeholder="you@example.com">
+    </div>
+    <div class="form-group">
+      <label class="form-label">password</label>
+      <input type="password" class="form-input" id="signup-password" placeholder="at least 6 characters">
+    </div>
+    <div class="error" id="signup-error"></div>
+    <button class="btn" id="signup-submit">create account</button>
+    <div class="switch">already have an account? <a id="show-login">log in</a></div>
+    <button class="dismiss" id="dismiss-signup">maybe later</button>
+  </div>
+
+  <div class="modal" id="login-modal">
+    <h2>welcome back</h2>
+    <p>sign in to continue</p>
+    <div class="form-group">
+      <label class="form-label">email</label>
+      <input type="email" class="form-input" id="login-email" placeholder="you@example.com">
+    </div>
+    <div class="form-group">
+      <label class="form-label">password</label>
+      <input type="password" class="form-input" id="login-password" placeholder="your password">
+    </div>
+    <div class="error" id="login-error"></div>
+    <button class="btn" id="login-submit">log in</button>
+    <div class="switch">new here? <a id="show-signup">create account</a></div>
+    <button class="dismiss" id="dismiss-login">maybe later</button>
+  </div>
+
+  <div class="story-modal" id="story-modal">
+    <div class="story-modal-header">
+      <button class="back-btn" id="story-back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <span class="modal-title">story</span>
+      <div style="width:36px"></div>
+    </div>
+    <div class="story-content" id="story-detail"></div>
+  </div>
+
+  <div class="finish-modal" id="finish-modal">
+    <div class="finish-modal-content">
+      <div class="finish-modal-header">
+        <h3>write your ending</h3>
+        <button class="finish-modal-close" id="finish-close">&times;</button>
+      </div>
+      <p class="hint">continue the story with your own twist</p>
+      <textarea class="form-input" id="ending-content" placeholder="and then..."></textarea>
+      <div class="btn-row">
+        <button class="btn-cancel" id="finish-cancel">cancel</button>
+        <button class="btn-submit" id="finish-submit">submit ending</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const SUPABASE_URL = 'https://pfvlmbgjjepbhbgsncgj.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_OKgbNNrKrNI9YG0SnuiyDQ_tPEF4ReY';
+
+    let sb;
+    try {
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    } catch(e) { console.error(e); }
+
+    let currentUser = null;
+    let currentUserRole = 'user';
+    let currentTab = 'unfinished';
+    let currentStory = null;
+    let allStories = [];
+
+    const $ = id => document.getElementById(id);
+    const toast = $('toast');
+    const modalOverlay = $('modal-overlay');
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function getInitials(name) {
+      return name ? name.substring(0, 2).toUpperCase() : '??';
+    }
+
+    function formatTime(ts) {
+      if (!ts) return 'now';
+      const diff = Date.now() - new Date(ts).getTime();
+      const mins = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+      if (mins < 1) return 'now';
+      if (mins < 60) return `${mins}m`;
+      if (hours < 24) return `${hours}h`;
+      return `${days}d`;
+    }
+
+    function goToScreen(screen) {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelector(`.nav-btn[data-screen="${screen}"]`).classList.add('active');
+      $(`${screen}-screen`).classList.add('active');
+      if (screen === 'inbox') loadInbox();
+      if (screen === 'profile') updateProfile();
+    }
+
+    function closeAllModals() {
+      modalOverlay.classList.remove('active');
+      $('story-modal').classList.remove('active');
+      $('finish-modal').classList.remove('active');
+      $('login-modal').classList.remove('active');
+      $('signup-modal').classList.remove('active');
+      $('ending-content').value = '';
+      currentStory = null;
+    }
+
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        closeAllModals();
+        goToScreen(btn.dataset.screen);
+      });
+    });
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentTab = tab.dataset.tab;
+        renderStories();
+      });
+    });
+
+    async function loadStories() {
+      const container = $('stories-container');
+      container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      if (!sb) { container.innerHTML = '<div class="empty"><h3>supabase not configured</h3></div>'; return; }
+      const { data, error } = await sb.from('stories').select('*').order('created_at', { ascending: false });
+      if (error) { container.innerHTML = `<div class="empty"><h3>error</h3><p>${error.message}</p></div>`; return; }
+      allStories = data || [];
+      renderStories();
+    }
+
+    function renderStories() {
+      const container = $('stories-container');
+      let stories = allStories;
+      if (currentTab === 'scary') stories = stories.filter(s => s.category === 'scary');
+      else if (currentTab === 'unfinished') stories = stories.filter(s => !s.is_finished);
+      else stories = stories.filter(s => s.is_finished);
+      if (stories.length === 0) { container.innerHTML = '<div class="empty"><h3>no stories yet</h3><p>be the first to write one</p></div>'; return; }
+      container.innerHTML = stories.map(s => `
+        <div class="story" onclick="openStory('${s.id}')">
+          <div class="story-header">
+            <div class="avatar">${getInitials(s.author_name)}</div>
+            <span class="author">${s.author_name}</span>
+          </div>
+          <h3 class="title">${s.title}</h3>
+          <p class="preview">${s.content}</p>
+          <div class="reactions">
+            <button class="reaction" onclick="event.stopPropagation(); react('${s.id}', 'heart')">❤️ ${s.reactions?.heart || 0}</button>
+            <button class="reaction" onclick="event.stopPropagation(); react('${s.id}', 'fire')">🔥 ${s.reactions?.fire || 0}</button>
+            <button class="reaction" onclick="event.stopPropagation(); react('${s.id}', 'scream')">😱 ${s.reactions?.scream || 0}</button>
+            <button class="reaction" onclick="event.stopPropagation(); react('${s.id}', 'laugh')">😂 ${s.reactions?.laugh || 0}</button>
+          </div>
+          <div class="stats">💬 ${s.comment_count || 0} comments</div>
+          ${!s.is_finished ? `<button class="finish-btn" onclick="event.stopPropagation(); openFinishModal('${s.id}')">finish this story</button>` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function openStory(id) {
+      const { data, error } = await sb.from('stories').select('*').eq('id', id).single();
+      if (error || !data) return;
+      currentStory = data;
+      const commentsRes = await sb.from('comments').select('*').eq('story_id', id).order('created_at', { ascending: false });
+      let comments = commentsRes.data || [];
+      comments.sort((a, b) => { if (a.is_pinned && !b.is_pinned) return -1; if (!a.is_pinned && b.is_pinned) return 1; return (b.likes || 0) - (a.likes || 0); });
+      const isAuthor = currentUser && currentUser.id === data.author_id;
+      const canManage = isAuthor || isAdmin();
+      $('story-detail').innerHTML = `
+        <div class="story-header" style="margin-bottom:16px;">
+          <div class="avatar" style="width:48px;height:48px;font-size:16px;">${getInitials(data.author_name)}</div>
+          <div>
+            <div class="author">${data.author_name}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${formatTime(data.created_at)} ago</div>
+          </div>
+          ${canManage ? '<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;margin-left:auto;" onclick="deleteStory(\'' + id + '\')">delete</button>' : ''}
+        </div>
+        <h1 style="font-size:20px;margin-bottom:8px;">${data.title}</h1>
+        <div class="story-body">${data.content}</div>
+        ${!data.is_finished ? '<button class="finish-btn" onclick="openFinishModalDirect()">finish this story</button>' : ''}
+        <div class="sticky-reactions">
+          <div class="reactions">
+            <button class="reaction" onclick="react('${id}', 'heart')">❤️ ${data.reactions?.heart || 0}</button>
+            <button class="reaction" onclick="react('${id}', 'fire')">🔥 ${data.reactions?.fire || 0}</button>
+          </div>
+        </div>
+        <div class="comments">
+          <h3 style="font-size:14px;font-weight:700;color:var(--text-secondary);margin-bottom:16px;">${comments.length} comments</h3>
+          ${comments.map(c => {
+            const canDeleteComment = (currentUser && currentUser.id === c.author_id) || isAdmin();
+            return `
+            <div class="comment ${c.is_story_ending ? 'ending' : ''} ${c.is_pinned ? 'pinned' : ''}" id="comment-${c.id}">
+              <div class="comment-header">
+                <span class="comment-author">${c.author_name}</span>
+                ${c.is_pinned ? '<span style="color:#1d9bf0;font-size:11px;">📌 pinned</span>' : ''}
+                <span class="comment-time">${formatTime(c.created_at)}</span>
+                ${(isAuthor || isAdmin()) ? `<button class="pin-btn ${c.is_pinned ? 'pinned' : ''}" onclick="togglePin('${c.id}', ${!c.is_pinned})">${c.is_pinned ? 'unpin' : 'pin'}</button>` : ''}
+                ${canDeleteComment ? `<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;margin-left:4px;" onclick="deleteComment('${c.id}', '${id}')">del</button>` : ''}
+              </div>
+              <p class="comment-text">${c.content}</p>
+            </div>
+          `}).join('')}
+        </div>
+      `;
+      $('story-modal').classList.add('active');
+    }
+
+    async function togglePin(commentId, pin) {
+      await sb.from('comments').update({ is_pinned: pin }).eq('id', commentId);
+      if (currentStory) openStory(currentStory.id);
+    }
+
+    $('story-back').addEventListener('click', () => {
+      closeAllModals();
+    });
+
+    async function react(storyId, type) {
+      if (!currentUser) { showLoginModal(); return; }
+      const story = allStories.find(s => s.id === storyId) || currentStory;
+      if (!story) return;
+      const reactions = story.reactions || { heart: 0, fire: 0, scream: 0, laugh: 0, cry: 0 };
+      const userReactions = story.user_reactions || {};
+      if (userReactions[currentUser.id] === type) {
+        reactions[type] = Math.max(0, reactions[type] - 1);
+        delete userReactions[currentUser.id];
+      } else {
+        if (userReactions[currentUser.id]) reactions[userReactions[currentUser.id]] = Math.max(0, reactions[userReactions[currentUser.id]] - 1);
+        reactions[type]++;
+        userReactions[currentUser.id] = type;
+      }
+      await sb.from('stories').update({ reactions, user_reactions: userReactions }).eq('id', storyId);
+      loadStories();
+      if (currentStory && currentStory.id === storyId) openStory(storyId);
+    }
+
+    async function openFinishModal(storyId) {
+      if (!currentUser) { showLoginModal(); return; }
+      const story = allStories.find(s => s.id === storyId);
+      if (!story) return;
+      currentStory = story;
+      if (!currentStory.is_finished) {
+        $('finish-modal').classList.add('active');
+      }
+    }
+
+    function openFinishModalDirect() {
+      if (!currentUser) { showLoginModal(); return; }
+      if (currentStory && !currentStory.is_finished) {
+        $('finish-modal').classList.add('active');
+      }
+    }
+
+    function closeFinishModal() {
+      $('finish-modal').classList.remove('active');
+      $('ending-content').value = '';
+    }
+
+    document.getElementById('finish-close').addEventListener('click', closeFinishModal);
+    document.getElementById('finish-cancel').addEventListener('click', closeFinishModal);
+    $('finish-modal').addEventListener('click', (e) => { if (e.target === $('finish-modal')) closeFinishModal(); });
+
+    document.getElementById('finish-submit').addEventListener('click', async () => {
+      const content = $('ending-content').value.trim();
+      if (content.length < 10) { showToast('ending must be at least 10 characters'); return; }
+      await sb.from('comments').insert({
+        story_id: currentStory.id, author_id: currentUser.id, author_name: currentUser.name,
+        content, is_story_ending: true, likes: 0, is_pinned: false, created_at: new Date().toISOString()
+      });
+      await sb.from('stories').update({ comment_count: (currentStory.comment_count || 0) + 1 }).eq('id', currentStory.id);
+      closeFinishModal();
+      showToast('your ending has been added!');
+      loadStories();
+      openStory(currentStory.id);
+    });
+
+    function showLoginModal() {
+      modalOverlay.classList.add('active');
+      $('login-modal').classList.add('active');
+    }
+
+    function showSignupModal() {
+      $('login-modal').classList.remove('active');
+      $('signup-modal').classList.add('active');
+    }
+
+    const themeToggle = $('theme-toggle');
+    const sunIcon = document.querySelector('.sun-icon');
+    const moonIcon = document.querySelector('.moon-icon');
+
+    function setTheme(theme) {
+      if (theme === 'light') {
+        document.body.setAttribute('data-theme', 'light');
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = 'block';
+        localStorage.setItem('theme', 'light');
+      } else {
+        document.body.removeAttribute('data-theme');
+        sunIcon.style.display = 'block';
+        moonIcon.style.display = 'none';
+        localStorage.setItem('theme', 'dark');
+      }
+    }
+
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) setTheme(savedTheme);
+    themeToggle.addEventListener('click', () => {
+      const current = document.body.getAttribute('data-theme');
+      setTheme(current === 'light' ? 'dark' : 'light');
+    });
+
+    function closeModals() {
+      modalOverlay.classList.remove('active');
+      $('login-modal').classList.remove('active');
+      $('signup-modal').classList.remove('active');
+    }
+
+    $('show-login').addEventListener('click', showLoginModal);
+    $('show-signup').addEventListener('click', showSignupModal);
+    $('dismiss-signup').addEventListener('click', closeModals);
+    $('dismiss-login').addEventListener('click', closeModals);
+    $('login-btn').addEventListener('click', showLoginModal);
+    modalOverlay.addEventListener('click', closeModals);
+
+    $('signup-submit').addEventListener('click', async () => {
+      const name = $('signup-name').value.trim();
+      const email = $('signup-email').value.trim();
+      const password = $('signup-password').value;
+      if (!name || !email || !password) { $('signup-error').textContent = 'please fill in all fields'; $('signup-error').style.display = 'block'; return; }
+      const btn = $('signup-submit');
+      btn.disabled = true;
+      btn.textContent = 'creating...';
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) { $('signup-error').textContent = error.message; $('signup-error').style.display = 'block'; btn.disabled = false; btn.textContent = 'create account'; return; }
+      if (data.user) {
+        await sb.from('profiles').insert({ id: data.user.id, name, email, created_at: new Date().toISOString() });
+        currentUser = { id: data.user.id, email, name };
+        closeModals();
+        showToast(`welcome, ${name}!`);
+        updateProfile();
+        loadStories();
+      }
+      btn.disabled = false;
+      btn.textContent = 'create account';
+    });
+
+    $('login-submit').addEventListener('click', async () => {
+      const email = $('login-email').value.trim();
+      const password = $('login-password').value;
+      if (!email || !password) { $('login-error').textContent = 'please fill in all fields'; $('login-error').style.display = 'block'; return; }
+      const btn = $('login-submit');
+      btn.disabled = true;
+      btn.textContent = 'logging in...';
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) { $('login-error').textContent = error.message; $('login-error').style.display = 'block'; btn.disabled = false; btn.textContent = 'log in'; return; }
+      if (data.user) {
+        const profile = await sb.from('profiles').select('*').eq('id', data.user.id).single();
+        currentUser = { id: data.user.id, email: data.user.email, name: profile.data?.name || data.user.email };
+        currentUserRole = profile.data?.role || 'user';
+        closeModals();
+        showToast('welcome back!');
+        updateProfile();
+        loadStories();
+      }
+    });
+
+    function isAdmin() { return currentUserRole === 'admin' || currentUserRole === 'mod'; }
+
+    async function deleteStory(id) {
+      if (!confirm('delete this story?')) return;
+      await sb.from('stories').delete().eq('id', id);
+      showToast('story deleted');
+      closeAllModals();
+      loadStories();
+    }
+
+    async function deleteComment(id, storyId) {
+      if (!confirm('delete this comment?')) return;
+      await sb.from('comments').delete().eq('id', id);
+      openStory(storyId);
+      showToast('comment deleted');
+    }
+
+    $('logout-btn').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      currentUser = null;
+      currentUserRole = 'user';
+      updateProfile();
+      loadStories();
+      showToast('signed out');
+    });
+
+    function updateProfile() {
+      if (currentUser) {
+        $('profile-avatar').textContent = getInitials(currentUser.name);
+        let displayName = currentUser.name;
+        if (isAdmin()) displayName += ' [' + currentUserRole + ']';
+        $('profile-name').textContent = displayName;
+        $('profile-handle').textContent = '@' + currentUser.name.toLowerCase().replace(/\s+/g, '_');
+        $('logout-btn').style.display = 'block';
+        $('login-btn').style.display = 'none';
+        const myStories = allStories.filter(s => s.author_id === currentUser.id);
+        $('stat-stories').textContent = myStories.length;
+        if (!$('edit-profile-btn')) {
+          const editBtn = document.createElement('button');
+          editBtn.id = 'edit-profile-btn';
+          editBtn.className = 'logout-btn';
+          editBtn.textContent = 'edit profile';
+          editBtn.onclick = showEditProfile;
+          $('login-btn').before(editBtn);
+        }
+        $('admin-panel').style.display = isAdmin() ? 'block' : 'none';
+      } else {
+        $('profile-avatar').textContent = '?';
+        $('profile-name').textContent = 'guest';
+        $('profile-handle').textContent = '@guest';
+        $('logout-btn').style.display = 'none';
+        $('login-btn').style.display = 'block';
+        $('stat-stories').textContent = '0';
+        $('admin-panel').style.display = 'none';
+        const editBtn = $('edit-profile-btn');
+        if (editBtn) editBtn.remove();
+      }
+    }
+
+    function showEditProfile() {
+      $('edit-profile-section').style.display = 'block';
+      $('edit-display-name').value = currentUser.name;
+    }
+
+    async function saveProfile() {
+      const newName = $('edit-display-name').value.trim();
+      if (!newName) { showToast('name cannot be empty'); return; }
+      await sb.from('profiles').update({ name: newName }).eq('id', currentUser.id);
+      currentUser.name = newName;
+      const { data: userStories } = await sb.from('stories').select('id').eq('author_id', currentUser.id);
+      if (userStories) { for (const s of userStories) { await sb.from('stories').update({ author_name: newName }).eq('id', s.id); } }
+      const { data: userComments } = await sb.from('comments').select('id').eq('author_id', currentUser.id);
+      if (userComments) { for (const c of userComments) { await sb.from('comments').update({ author_name: newName }).eq('id', c.id); } }
+      $('edit-profile-section').style.display = 'none';
+      showToast('profile updated!');
+      updateProfile();
+      loadStories();
+    }
+
+    function showAdminSection(section) {
+      if (section === 'users') loadAllUsers();
+      else if (section === 'stories') loadAllStories();
+      else if (section === 'all') loadAllActivity();
+    }
+
+    async function loadAllUsers() {
+      const results = $('admin-results');
+      results.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
+      if (error || !data) { results.innerHTML = '<p style="color:#dc3545;">error loading users</p>'; return; }
+      results.innerHTML = `<h4 style="font-size:13px;margin-bottom:12px;">all users (${data.length})</h4>` + data.map(u => `
+        <div style="padding:10px;background:var(--bg-tertiary);border-radius:8px;margin-bottom:8px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div class="avatar" style="width:32px;height:32px;font-size:11px;">${getInitials(u.name)}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.name}</div>
+              <div style="font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.email}</div>
+            </div>
+            <span style="font-size:10px;padding:2px 6px;background:${u.role === 'admin' ? '#dc3545' : u.role === 'mod' ? '#fd7e14' : '#1d9bf0'};border-radius:4px;">${u.role || 'user'}</span>
+          </div>
+          ${currentUserRole === 'admin' && u.id !== currentUser.id ? `
+            <div style="display:flex;gap:4px;">
+              <select onchange="changeUserRole('${u.id}', this.value)" style="flex:1;padding:6px;font-size:11px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px;">
+                <option value="user" ${(u.role || 'user') === 'user' ? 'selected' : ''}>user</option>
+                <option value="mod" ${u.role === 'mod' ? 'selected' : ''}>mod</option>
+                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+              </select>
+              <button onclick="editUserProfile('${u.id}')" style="padding:6px 8px;font-size:11px;background:#198754;border:none;border-radius:4px;cursor:pointer;color:#fff;">edit</button>
+              <button onclick="deleteUser('${u.id}', '${u.name}')" style="padding:6px 8px;font-size:11px;background:#dc3545;border:none;border-radius:4px;cursor:pointer;color:#fff;">del</button>
+            </div>
+          ` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function loadAllStories() {
+      const results = $('admin-results');
+      results.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      const { data, error } = await sb.from('stories').select('*').order('created_at', { ascending: false });
+      if (error || !data) { results.innerHTML = '<p style="color:#dc3545;">error loading stories</p>'; return; }
+      results.innerHTML = `<h4 style="font-size:13px;margin-bottom:12px;">all stories (${data.length})</h4>` + data.map(s => `
+        <div style="padding:10px;background:var(--bg-tertiary);border-radius:8px;margin-bottom:8px;">
+          <div style="font-weight:600;font-size:12px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.title}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;">by ${s.author_name} • ${s.category} • ${formatTime(s.created_at)} ago</div>
+          <div style="display:flex;gap:4px;">
+            <button onclick="editStory('${s.id}')" style="flex:1;padding:6px;font-size:11px;background:#198754;border:none;border-radius:4px;cursor:pointer;color:#fff;">edit</button>
+            <button onclick="pinStory('${s.id}', ${!s.is_finished})" style="flex:1;padding:6px;font-size:11px;background:#6f42c1;border:none;border-radius:4px;cursor:pointer;color:#fff;">${s.is_finished ? 'unfinish' : 'finish'}</button>
+            <button onclick="deleteStoryAdmin('${s.id}')" style="flex:1;padding:6px;font-size:11px;background:#dc3545;border:none;border-radius:4px;cursor:pointer;color:#fff;">delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadAllActivity() {
+      const results = $('admin-results');
+      results.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      const [users, stories, comments] = await Promise.all([
+        sb.from('profiles').select('*').order('created_at', { ascending: false }),
+        sb.from('stories').select('*').order('created_at', { ascending: false }),
+        sb.from('comments').select('*').order('created_at', { ascending: false })
+      ]);
+      results.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+          <div style="padding:12px;background:var(--bg-tertiary);border-radius:8px;text-align:center;">
+            <div style="font-size:20px;font-weight:700;">${users.data?.length || 0}</div>
+            <div style="font-size:10px;color:var(--text-muted);">users</div>
+          </div>
+          <div style="padding:12px;background:var(--bg-tertiary);border-radius:8px;text-align:center;">
+            <div style="font-size:20px;font-weight:700;">${stories.data?.length || 0}</div>
+            <div style="font-size:10px;color:var(--text-muted);">stories</div>
+          </div>
+          <div style="padding:12px;background:var(--bg-tertiary);border-radius:8px;text-align:center;">
+            <div style="font-size:20px;font-weight:700;">${comments.data?.length || 0}</div>
+            <div style="font-size:10px;color:var(--text-muted);">comments</div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function changeUserRole(userId, newRole) {
+      await sb.from('profiles').update({ role: newRole }).eq('id', userId);
+      showToast(`role updated to ${newRole}`);
+      loadAllUsers();
+    }
+
+    async function editUserProfile(userId) {
+      const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
+      if (!data) return;
+      const newName = prompt('edit display name:', data.name);
+      if (newName && newName.trim() !== data.name) {
+        await sb.from('profiles').update({ name: newName.trim() }).eq('id', userId);
+        await sb.from('stories').update({ author_name: newName.trim() }).eq('author_id', userId);
+        await sb.from('comments').update({ author_name: newName.trim() }).eq('author_id', userId);
+        showToast('user profile updated');
+        loadAllUsers();
+      }
+    }
+
+    async function deleteUser(userId, userName) {
+      if (!confirm(`delete user "${userName}" and all their content?`)) return;
+      await sb.from('comments').delete().eq('author_id', userId);
+      await sb.from('stories').delete().eq('author_id', userId);
+      await sb.from('profiles').delete().eq('id', userId);
+      try { await sb.auth.admin.deleteUser(userId); } catch(e) {}
+      showToast('user deleted');
+      loadAllUsers();
+      loadStories();
+    }
+
+    async function editStory(storyId) {
+      const { data } = await sb.from('stories').select('*').eq('id', storyId).single();
+      if (!data) return;
+      const newTitle = prompt('edit title:', data.title);
+      const newContent = prompt('edit content:', data.content);
+      if (newTitle && newContent && (newTitle !== data.title || newContent !== data.content)) {
+        await sb.from('stories').update({ title: newTitle, content: newContent }).eq('id', storyId);
+        showToast('story updated');
+        loadAllStories();
+        loadStories();
+      }
+    }
+
+    async function pinStory(storyId, shouldFinish) {
+      await sb.from('stories').update({ is_finished: shouldFinish }).eq('id', storyId);
+      showToast(shouldFinish ? 'story marked as finished' : 'story marked as unfinished');
+      loadAllStories();
+      loadStories();
+    }
+
+    async function deleteStoryAdmin(storyId) {
+      if (!confirm('delete this story?')) return;
+      await sb.from('comments').delete().eq('story_id', storyId);
+      await sb.from('stories').delete().eq('id', storyId);
+      showToast('story deleted');
+      loadAllStories();
+      loadStories();
+    }
+
+    document.querySelectorAll('.category').forEach(cat => {
+      cat.addEventListener('click', () => {
+        document.querySelectorAll('.category').forEach(c => c.classList.remove('selected'));
+        cat.classList.add('selected');
+      });
+    });
+
+    $('publish-submit').addEventListener('click', async () => {
+      if (!currentUser) { showLoginModal(); return; }
+      const title = $('story-title').value.trim();
+      const content = $('story-content').value.trim();
+      const category = document.querySelector('.category.selected').dataset.category;
+      if (!title || !content) { showToast('please fill in title and content'); return; }
+      await sb.from('stories').insert({
+        title, content, category, is_finished: category === 'finished',
+        author_id: currentUser.id, author_name: currentUser.name,
+        reactions: { heart: 0, fire: 0, scream: 0, laugh: 0, cry: 0 },
+        user_reactions: {}, followers: [], comment_count: 0, created_at: new Date().toISOString()
+      });
+      $('story-title').value = '';
+      $('story-content').value = '';
+      goToScreen('feed');
+      showToast('story published!');
+      loadStories();
+    });
+
+    async function loadInbox() {
+      const container = $('inbox-container');
+      if (!currentUser) { container.innerHTML = '<div class="empty"><h3>sign in to see interactions</h3><p>interactions on your stories will appear here</p></div>'; return; }
+      const myStoryIds = allStories.filter(s => s.author_id === currentUser.id).map(s => s.id);
+      if (myStoryIds.length === 0) { container.innerHTML = '<div class="empty"><h3>no interactions yet</h3><p>publish stories to get interactions</p></div>'; return; }
+      const { data } = await sb.from('comments').select('*').in('story_id', myStoryIds).order('created_at', { ascending: false }).limit(20);
+      if (!data || data.length === 0) { container.innerHTML = '<div class="empty"><h3>no interactions yet</h3><p>interactions on your stories will appear here</p></div>'; return; }
+      container.innerHTML = data.map(c => `
+        <div class="inbox-item">
+          <div class="avatar" style="width:44px;height:44px;font-size:14px;">${getInitials(c.author_name)}</div>
+          <div class="inbox-content">
+            <p class="inbox-text"><strong>${c.author_name}</strong> ${c.is_story_ending ? 'finished your story' : 'commented on your story'}</p>
+            <span class="inbox-time">${formatTime(c.created_at)} ago</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    if (sb) {
+      loadStories();
+      sb.auth.getSession().then(async ({ data }) => {
+        if (data.session?.user) {
+          const profile = await sb.from('profiles').select('*').eq('id', data.session.user.id).single();
+          currentUser = { id: data.session.user.id, email: data.session.user.email, name: profile.data?.name || data.session.user.email };
+          currentUserRole = profile.data?.role || 'user';
+          updateProfile();
+        }
+      });
+    } else {
+      $('stories-container').innerHTML = '<div class="empty"><h3>supabase not connected</h3><p>check browser console for errors</p></div>';
+    }
+  </script>
+</body>
+</html>
