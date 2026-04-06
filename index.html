@@ -1374,7 +1374,11 @@
           $('profile-avatar').textContent = getInitials(currentUser.name);
         }
         let displayName = currentUser.name;
-        if (isAdmin()) displayName += ' [' + currentUserRole + ']';
+        if (currentUser.email === OWNER_EMAIL) {
+          displayName += ' [owner]';
+        } else if (isAdmin()) {
+          displayName += ' [' + currentUserRole + ']';
+        }
         $('profile-name').textContent = displayName;
         $('profile-handle').textContent = '@' + currentUser.name.toLowerCase().replace(/\s+/g, '_');
         $('logout-btn').style.display = 'block';
