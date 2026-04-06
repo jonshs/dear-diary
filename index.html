@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>dear diary</title>
-  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&family=Montserrat+Alternates:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&family=Montserrat+Alternates:wght@600;700&family=Roboto:wght@400;500;600&family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -15,7 +15,7 @@
       min-height: 100vh;
       display: flex;
       justify-content: center;
-    }
+    } 
     .app {
       width: 100%;
       max-width: 430px;
@@ -90,6 +90,8 @@
       cursor: pointer;
       position: relative;
     }
+    /* Ensure tab labels also use Quicksand for consistency */
+    .tab, .inbox-tab { font-family: 'Quicksand', sans-serif; }
     .tab.active { color: #e7e7e7; }
     .tab.active::after {
       content: '';
@@ -215,7 +217,7 @@
     .action-btn.liked.active {
       animation: likePop 0.3s ease;
     }
-    .stats { font-size: 13px; color: #71767b; }
+    .stats { font-size: 15px; color: #71767b; font-weight: 500; }
     .empty {
       text-align: center;
       padding: 64px 24px;
@@ -347,6 +349,7 @@
       top: 0;
       background: #000;
     }
+    .profile-verified { display: inline-block; vertical-align: middle; margin-left: 6px; }
     .back-btn {
       width: 36px;
       height: 36px;
@@ -367,7 +370,13 @@
     .comment { padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.07); }
     .comment-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
     .comment-author { font-weight: 600; font-size: 13px; color: #e7e7e7; }
-    .comment-time { font-size: 11px; color: #71767b; }
+    .comment-time { font-family: 'Quicksand', sans-serif; font-size: 16px; color: #71767b; font-weight: 600; }
+    .post-time { font-family: 'Quicksand', sans-serif; font-size: 14px; color: #71767b; font-weight: 500; }
+    .story-meta { font-family: 'Quicksand', sans-serif; font-size: 14px; font-weight: 500; color: var(--text-muted); }
+    .listen-btn { padding: 8px 16px; background: #1d9bf0; border: none; border-radius: 20px; color: #fff; font-family: 'Quicksand', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .listen-btn:hover { background: #1a8cd8; }
+    .listen-btn.listening { background: #fe2c55; }
+    .listen-btn svg { width: 16px; height: 16px; }
     .comment-text { font-size: 16px; color: #ffffff; line-height: 1.5; }
     .comment.ending { background: rgba(29,155,240,0.15); padding: 12px; border-radius: 8px; margin-bottom: 8px; }
     .comment.pinned { background: rgba(29,155,240,0.15); padding: 12px; border-radius: 8px; margin-bottom: 8px; }
@@ -483,7 +492,7 @@
     .inbox-content { flex: 1; }
     .inbox-text { font-size: 14px; margin-bottom: 2px; }
     .inbox-text strong { font-weight: 600; }
-    .inbox-time { font-size: 12px; color: #536471; }
+    .inbox-time { font-family: 'Quicksand', sans-serif; font-size: 14px; color: #536471; font-weight: 500; }
     .loading { display: flex; justify-content: center; padding: 48px; }
     .spinner { width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.07); border-top-color: #1d9bf0; border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -708,9 +717,10 @@
           <button class="tab" data-tab="finished">finished</button>
         </div>
         <div class="search-bar">
-          <input type="text" class="search-input" id="search-input" placeholder="search stories...">
+          <input type="text" class="search-input" id="search-input" placeholder="search stories & users...">
         </div>
         <div class="stories" id="stories-container"><div class="loading"><div class="spinner"></div></div></div>
+        <div id="user-search-results" class="stories" style="display:none; padding:0 16px 8px; border-bottom: 1px solid rgba(255,255,255,0.07);"></div>
       </div>
 
       <div class="screen" id="publish-screen">
@@ -760,7 +770,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
           </button>
           <div class="profile-avatar" id="user-profile-avatar">?</div>
-          <h2 class="profile-name" id="user-profile-name">author</h2>
+      <h2 class="profile-name" id="user-profile-name">author <span id="profile-verified" class="profile-verified"></span></h2>
           <p class="profile-handle" id="user-profile-handle">@author</p>
           <div class="profile-stats">
             <div class="profile-stat" style="cursor:pointer;" onclick="setUserProfileTab('stories')">
@@ -1005,19 +1015,6 @@
       localStorage.removeItem(DRAFT_KEY);
     }
 
-    $('story-title').addEventListener('input', saveDraft);
-    $('story-content').addEventListener('input', saveDraft);
-    document.querySelectorAll('.category').forEach(c => c.addEventListener('click', saveDraft));
-
-    const writeObserver = new MutationObserver((mutations) => {
-      mutations.forEach((m) => {
-        if (m.target.classList.contains('active') && m.target.id === 'publish-screen') {
-          loadDraft();
-        }
-      });
-    });
-    writeObserver.observe($('publish-screen'), { attributes: true, attributeFilter: ['class'] });
-
     const SUPABASE_URL = 'https://pfvlmbgjjepbhbgsncgj.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_OKgbNNrKrNI9YG0SnuiyDQ_tPEF4ReY';
     const OWNER_EMAIL = 'hackoili1998@gmail.com';
@@ -1040,6 +1037,20 @@
     let likedStories = {};
 
     const $ = id => document.getElementById(id);
+    
+    // Draft functionality - moved after $ function definition
+    $('story-title').addEventListener('input', saveDraft);
+    $('story-content').addEventListener('input', saveDraft);
+    document.querySelectorAll('.category').forEach(c => c.addEventListener('click', saveDraft));
+
+    const writeObserver = new MutationObserver((mutations) => {
+      mutations.forEach((m) => {
+        if (m.target.classList.contains('active') && m.target.id === 'publish-screen') {
+          loadDraft();
+        }
+      });
+    });
+    writeObserver.observe($('publish-screen'), { attributes: true, attributeFilter: ['class'] });
     const toast = $('toast');
     const modalOverlay = $('modal-overlay');
 
@@ -1074,15 +1085,45 @@
     }
 
     function formatTime(ts) {
-      if (!ts) return 'now';
-      const diff = Date.now() - new Date(ts).getTime();
-      const mins = Math.floor(diff / 60000);
-      const hours = Math.floor(diff / 3600000);
-      const days = Math.floor(diff / 86400000);
-      if (mins < 1) return 'now';
-      if (mins < 60) return `${mins}m`;
-      if (hours < 24) return `${hours}h`;
-      return `${days}d`;
+        if (!ts) return 'now';
+        
+        const now = new Date();
+        const then = new Date(ts);
+        const diffMs = now - then; // milliseconds
+        const diffSec = Math.round(diffMs / 1000);
+        const diffMin = Math.round(diffSec / 60);
+        const diffHours = Math.round(diffMin / 60);
+        const diffDays = Math.round(diffHours / 24);
+        const diffWeeks = Math.round(diffDays / 7);
+        const diffYears = Math.round(diffDays / 365);
+        
+        // If it's been a year or more, show full date
+        if (diffYears >= 1) {
+            return then.toLocaleDateString('en-US', {
+                month: '2-digit',
+                day: '2-digit',
+                year: 'numeric'
+            }).replace(/\//g, '-');
+        }
+        
+        // If it's been a week or more, show month-day
+        if (diffWeeks >= 1) {
+            return then.toLocaleDateString('en-US', {
+                month: '2-digit',
+                day: '2-digit'
+            }).replace(/\//g, '-');
+        }
+        
+        // Otherwise show relative time
+        if (diffSec < 60) {
+            return `${diffSec}s`;
+        } else if (diffMin < 60) {
+            return `${diffMin}m`;
+        } else if (diffHours < 24) {
+            return `${diffHours}hr`;
+        } else {
+            return `${diffDays}d`;
+        }
     }
 
     function getAvatarHTML(userId, name, size = 40) {
@@ -1131,6 +1172,8 @@
         const userId = parts[1];
         const userName = parts[2] || 'author';
         viewUserProfile(userId, decodeURIComponent(userName));
+        // update verified badge in profile header after loading profile
+        setTimeout(() => { const badgeEl = document.getElementById('profile-verified'); if (badgeEl) badgeEl.innerHTML = getBadge(userId); }, 0);
         return;
       }
 
@@ -1346,7 +1389,7 @@
                       ${getInitials(c.author_name)}
                     </a>
                     <a href="#/user/${c.author_id}/${encodeURIComponent(c.author_name)}" class="comment-author" style="font-weight:600;font-size:12px;color:#e7e7e7;text-decoration:none;">${c.author_name}</a>
-                    <span style="font-size:10px;color:#71767b;">${formatTime(c.created_at)}</span>
+<span style="font-size:14px;color:#71767b;font-weight:500;">${formatTime(c.created_at)}</span>
                     ${canEdC ? `<button onclick="editCommentInline('${c.id}','${s.id}')" style="background:none;border:none;color:#198754;font-size:10px;cursor:pointer;">edit</button>` : ''}
                     ${canDelC ? `<button onclick="deleteCommentInline('${c.id}','${s.id}')" style="background:none;border:none;color:#dc3545;font-size:10px;cursor:pointer;margin-left:auto;">del</button>` : ''}
                   </div>
@@ -1370,6 +1413,45 @@
       }
       
       container.innerHTML = html;
+    }
+
+    function toggleListen(storyId) {
+      if (!window.speechSynthesis) {
+        showToast('speech not supported');
+        return;
+      }
+      const btn = $('listen-btn');
+      if (speechSynthesis.speaking) {
+        speechSynthesis.cancel();
+        btn.classList.remove('listening');
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg> listen';
+        return;
+      }
+      const story = allStories.find(s => s.id === storyId) || currentStory;
+      if (!story) return;
+      const text = `${story.title}. ${story.content}`;
+      const utterance = new SpeechSynthesisUtterance(text);
+      const savedRate = parseFloat(localStorage.getItem('dd-rate') || '1');
+      const savedPitch = parseFloat(localStorage.getItem('dd-pitch') || '1');
+      const savedVoice = localStorage.getItem('dd-voice');
+      utterance.rate = savedRate;
+      utterance.pitch = savedPitch;
+      if (savedVoice) {
+        const voices = speechSynthesis.getVoices();
+        const v = voices.find(v => v.name === savedVoice);
+        if (v) utterance.voice = v;
+      }
+      utterance.onend = () => {
+        btn.classList.remove('listening');
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg> listen';
+      };
+      utterance.onerror = () => {
+        btn.classList.remove('listening');
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg> listen';
+      };
+      btn.classList.add('listening');
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> stop';
+      speechSynthesis.speak(utterance);
     }
 
     async function shareStory(storyId) {
@@ -1435,7 +1517,7 @@
           <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
               <span style="font-weight:600;font-size:12px;color:#e7e7e7;">${c.author_name}</span>
-              <span style="font-size:10px;color:#71767b;">${formatTime(c.created_at)}</span>
+              <span style="font-size:14px;color:#71767b;font-weight:500;">${formatTime(c.created_at)}</span>
             </div>
             <p style="font-size:14px;color:#ffffff;line-height:1.4;">${c.content}</p>
             <button style="background:none;border:none;color:#1d9bf0;font-size:13px;cursor:pointer;padding:6px 8px;" onclick="showInlineReplyForm('${c.id}','${storyId}')">reply</button>
@@ -1508,7 +1590,7 @@
         <div style="padding:4px 0;">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
             <span style="font-weight:600;font-size:11px;color:#e7e7e7;">${r.author_name}</span>
-            <span style="font-size:9px;color:#71767b;">${formatTime(r.created_at)}</span>
+            <span style="font-size:14px;color:#71767b;font-weight:500;">${formatTime(r.created_at)}</span>
             ${canEdR ? `<button onclick="editReplyInline('${r.id}','${storyId}')" style="background:none;border:none;color:#198754;font-size:9px;cursor:pointer;">edit</button>` : ''}
             ${canDelR ? `<button onclick="deleteReplyInline('${r.id}','${storyId}')" style="background:none;border:none;color:#dc3545;font-size:9px;cursor:pointer;margin-left:auto;">del</button>` : ''}
           </div>
@@ -1952,7 +2034,7 @@
           <div class="avatar" style="width:48px;height:48px;font-size:16px;">${getInitials(data.author_name)}</div>
           <div>
             <div class="author" style="cursor:pointer;" onclick="viewUserProfile('${data.author_id}', '${data.author_name}')">${data.author_name}<span style="color:#ffd700;">${getBadge(data.author_id)}</span></div>
-            <div style="font-size:12px;color:var(--text-muted);">${formatTime(data.created_at)} ago</div>
+            <div style="font-size:16px;color:var(--text-muted);font-weight:500;" class="post-time">${formatTime(data.created_at)} ago</div>
           </div>
           <div style="display:flex;gap:6px;margin-left:auto;">
             ${canEdit ? '<button class="pin-btn" style="background:#198754;color:#fff;border-color:#198754;" onclick="editStoryInline(\'' + id + '\')">edit</button>' : ''}
@@ -1961,8 +2043,12 @@
         </div>
         <h1 style="font-size:20px;margin-bottom:8px;">${data.title}</h1>
         <div class="story-body">${data.content}</div>
-        ${!data.is_finished ? '<button class="finish-btn" onclick="openFinishModalDirect()">finish this story</button>' : ''}
-        <div class="sticky-reactions">
+          ${!data.is_finished ? '<button class="finish-btn" onclick="openFinishModalDirect()">finish this story</button>' : ''}
+          <button class="listen-btn" id="listen-btn" onclick="toggleListen('${id}')" style="margin-bottom:16px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            listen
+          </button>
+          <div class="sticky-reactions">
           <div class="reactions">
             <button class="reaction ${likedStories[id] ? 'active' : ''}" onclick="event.stopPropagation(); toggleLike('${id}')" style="display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:24px;font-size:15px;background:${likedStories[id] ? 'rgba(254,44,85,0.1)' : 'rgba(255,255,255,0.05)'};border:1px solid ${likedStories[id] ? 'rgba(254,44,85,0.3)' : 'rgba(255,255,255,0.1)'};">
               <span style="font-size:22px;transition:transform 0.2s;">${likedStories[id] ? '❤️' : '🤍'}</span>
@@ -2558,23 +2644,24 @@
         const now = Date.now();
         const nameDiff = profile.last_name_change ? Math.floor((now - new Date(profile.last_name_change).getTime()) / (1000 * 60 * 60 * 24)) : 999;
         const usernameDiff = profile.last_username_change ? Math.floor((now - new Date(profile.last_username_change).getTime()) / (1000 * 60 * 60 * 24)) : 999;
+        const isModOrUp = currentUserRole === 'mod' || currentUserRole === 'admin';
         
         const nameTimer = $('name-change-timer');
         const usernameTimer = $('username-change-timer');
         
-        if (nameDiff < 3) {
+        if (!isModOrUp && nameDiff < 3) {
           nameTimer.textContent = `can change in ${3 - nameDiff} days`;
           $('edit-display-name').disabled = true;
         } else {
-          nameTimer.textContent = '';
+          nameTimer.textContent = isModOrUp ? 'unlimited changes' : '';
           $('edit-display-name').disabled = false;
         }
         
-        if (usernameDiff < 30) {
+        if (!isModOrUp && usernameDiff < 30) {
           usernameTimer.textContent = `can change in ${30 - usernameDiff} days`;
           $('edit-username').disabled = true;
         } else {
-          usernameTimer.textContent = '';
+          usernameTimer.textContent = isModOrUp ? 'unlimited changes' : '';
           $('edit-username').disabled = false;
         }
       }
@@ -2593,35 +2680,41 @@
     }
 
     async function saveProfile() {
-      const newName = $('edit-display-name').value.trim();
-      const newUsername = $('edit-username').value.trim().replace(/[^a-zA-Z0-9_]/g, '');
-      const newEmail = $('edit-email').value.trim();
-      const newPassword = $('edit-password').value;
-      const newAvatar = $('edit-avatar-url').value;
-      
-      if (!newName) { showToast('name cannot be empty'); return; }
+        const newName = $('edit-display-name').value.trim();
+        const newUsername = $('edit-username').value.trim();
+        const newEmail = $('edit-email').value.trim();
+        const newPassword = $('edit-password').value;
+        const newAvatar = $('edit-avatar-url').value;
+        
+        if (!newName) { showToast('name cannot be empty'); return; }
+        
+        if (newUsername && /[^a-zA-Z0-9_.]/.test(newUsername)) {
+          showToast('username can only contain letters, numbers, _ and .');
+          return;
+        }
       
       const { data: profile } = await sb.from('profiles').select('last_name_change, last_username_change, username').eq('id', currentUser.id).single();
       const now = new Date().toISOString();
       
-      const updates = { name: newName };
-      const nameDiff = profile?.last_name_change ? Math.floor((Date.now() - new Date(profile.last_name_change).getTime()) / (1000 * 60 * 60 * 24)) : 999;
-      const usernameDiff = profile?.last_username_change ? Math.floor((Date.now() - new Date(profile.last_username_change).getTime()) / (1000 * 60 * 60 * 24)) : 999;
-      
-      if (newName !== currentUser.name && nameDiff >= 3) {
-        updates.last_name_change = now;
-      } else if (newName !== currentUser.name && nameDiff < 3) {
-        showToast('display name can only be changed every 3 days');
-        return;
-      }
-      
-      if (newUsername && newUsername !== profile?.username && usernameDiff >= 30) {
-        updates.username = newUsername;
-        updates.last_username_change = now;
-      } else if (newUsername && newUsername !== profile?.username && usernameDiff < 30) {
-        showToast('username can only be changed every 30 days');
-        return;
-      }
+        const updates = { name: newName };
+        const nameDiff = profile?.last_name_change ? Math.floor((Date.now() - new Date(profile.last_name_change).getTime()) / (1000 * 60 * 60 * 24)) : 999;
+        const usernameDiff = profile?.last_username_change ? Math.floor((Date.now() - new Date(profile.last_username_change).getTime()) / (1000 * 60 * 60 * 24)) : 999;
+        const isModOrUp = currentUserRole === 'mod' || currentUserRole === 'admin';
+        
+        if (newName !== currentUser.name && (isModOrUp || nameDiff >= 3)) {
+          if (!isModOrUp) updates.last_name_change = now;
+        } else if (newName !== currentUser.name && !isModOrUp && nameDiff < 3) {
+          showToast('display name can only be changed every 3 days');
+          return;
+        }
+        
+        if (newUsername && newUsername !== profile?.username && (isModOrUp || usernameDiff >= 30)) {
+          updates.username = newUsername;
+          if (!isModOrUp) updates.last_username_change = now;
+        } else if (newUsername && newUsername !== profile?.username && !isModOrUp && usernameDiff < 30) {
+          showToast('username can only be changed every 30 days');
+          return;
+        }
       
       if (newAvatar && (newAvatar.startsWith('data:') || newAvatar.startsWith('http'))) {
         updates.avatar = newAvatar;
@@ -2822,7 +2915,8 @@
       results.innerHTML = `<h4 style="font-size:13px;margin-bottom:12px;">all stories (${data.length})</h4>` + data.map(s => `
         <div style="padding:10px;background:var(--bg-tertiary);border-radius:8px;margin-bottom:8px;">
           <div style="font-weight:600;font-size:12px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.title}</div>
-          <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;">by ${s.author_name} • ${s.category} • ${formatTime(s.created_at)} ago</div>
+          <div style="font-size:14px;color:var(--text-muted);font-weight:500;margin-bottom:4px;" class="story-meta">by ${s.author_name} • ${s.category}</div>
+          <div style="font-family: Roboto, sans-serif;font-size:14px;color:var(--text-muted);font-weight:500;margin-bottom:8px;" class="post-time">${formatTime(s.created_at)} ago</div>
           <div style="display:flex;gap:4px;">
             <button onclick="editStory('${s.id}')" style="flex:1;padding:6px;font-size:11px;background:#198754;border:none;border-radius:4px;cursor:pointer;color:#fff;">edit</button>
             <button onclick="pinStory('${s.id}', ${!s.is_finished})" style="flex:1;padding:6px;font-size:11px;background:#6f42c1;border:none;border-radius:4px;cursor:pointer;color:#fff;">${s.is_finished ? 'unfinish' : 'finish'}</button>
@@ -3087,6 +3181,50 @@
       $('stories-container').innerHTML = '<div class="empty"><h3>supabase not connected</h3><p>check browser console for errors</p></div>';
     }
 
+    // NEW: user search in the main search bar (search stories + users)
+    async function searchUsers(query) {
+      if (!sb) return [];
+      const { data, error } = await sb.from('profiles')
+        .select('*')
+        .or(`name.ilike.%${query}%,username.ilike.%${query}%,email.ilike.%${query}%`);
+      if (error || !data) return [];
+      return data;
+    }
+    function renderUserSearchResults(users) {
+      const el = document.getElementById('user-search-results');
+      if (!el) return;
+      if (!users || users.length === 0) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+      }
+      el.style.display = 'block';
+      el.innerHTML = `<div style="padding:6px 0 2px 0;font-size:12px;color:var(--text-muted);">users</div>` +
+        users.map(u => `
+          <div class="inbox-item" onclick="goToUser('${u.id}', '${u.name || ''}')" style="cursor:pointer;">
+            <div class="avatar" style="width:28px;height:28px;font-size:12px;">${getInitials(u.name || u.username || '')}</div>
+            <div class="inbox-content">
+              <div class="inbox-text"><strong>${u.name || u.username || ''}</strong> <span style="color:#ffd700;">${u.username || ''}</span></div>
+              <span class="inbox-time">${u.verified ? 'verified' : ''}</span>
+            </div>
+          </div>
+        `).join('');
+    }
+    function goToUser(userId, name) { window.location.hash = '/user/' + userId + '/' + encodeURIComponent(name || 'author'); }
+    // Bind search input
+    const searchInputEl = document.getElementById('search-input');
+    if (searchInputEl) {
+      searchInputEl.addEventListener('input', function() {
+        const q = this.value.trim();
+        if (q.length === 0) {
+          const el = document.getElementById('user-search-results');
+          if (el) el.style.display = 'none';
+          renderStories();
+        } else {
+          searchUsers(q).then(renderUserSearchResults);
+        }
+      });
+    }
     handleRoute();
   </script>
 </body>
