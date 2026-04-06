@@ -727,6 +727,10 @@
             <div style="display:flex;flex-direction:column;gap:8px;">
               <label style="font-size:11px;color:var(--text-muted);">display name</label>
               <input type="text" class="form-input" id="edit-display-name" placeholder="display name" style="font-size:13px;">
+              <small id="name-change-timer" style="color:var(--text-muted);font-size:10px;"></small>
+              <label style="font-size:11px;color:var(--text-muted);">username</label>
+              <input type="text" class="form-input" id="edit-username" placeholder="username" style="font-size:13px;">
+              <small id="username-change-timer" style="color:var(--text-muted);font-size:10px;"></small>
               <label style="font-size:11px;color:var(--text-muted);">email</label>
               <input type="email" class="form-input" id="edit-email" placeholder="email" style="font-size:13px;">
               <label style="font-size:11px;color:var(--text-muted);">new password (leave empty to keep current)</label>
@@ -1380,7 +1384,7 @@
           displayName += ' [' + currentUserRole + ']';
         }
         $('profile-name').textContent = displayName;
-        $('profile-handle').textContent = '@' + currentUser.name.toLowerCase().replace(/\s+/g, '_');
+        $('profile-handle').textContent = '@' + (currentUser.username || currentUser.name.toLowerCase().replace(/\s+/g, '_'));
         $('logout-btn').style.display = 'block';
         $('login-btn').style.display = 'none';
         const myStories = allStories.filter(s => s.author_id === currentUser.id);
@@ -1410,20 +1414,70 @@
     function showEditProfile() {
       $('edit-profile-section').style.display = 'block';
       $('edit-display-name').value = currentUser.name;
+      $('edit-username').value = currentUser.username || '';
       $('edit-email').value = currentUser.email;
       $('edit-password').value = '';
       $('edit-avatar').value = currentUser.avatar || '';
+      
+      // Load profile to check change timers
+      const { data: profile } = await sb.from('profiles').select('last_name_change, last_username_change').eq('id', currentUser.id).single();
+      if (profile) {
+        const now = Date.now();
+        const nameDiff = profile.last_name_change ? Math.floor((now - new Date(profile.last_name_change).getTime()) / (1000 * 60 * 60 * 24)) : 999;
+        const usernameDiff = profile.last_username_change ? Math.floor((now - new Date(profile.last_username_change).getTime()) / (1000 * 60 * 60 * 24)) : 999;
+        
+        const nameTimer = $('name-change-timer');
+        const usernameTimer = $('username-change-timer');
+        
+        if (nameDiff < 3) {
+          nameTimer.textContent = `can change in ${3 - nameDiff} days`;
+          $('edit-display-name').disabled = true;
+        } else {
+          nameTimer.textContent = '';
+          $('edit-display-name').disabled = false;
+        }
+        
+        if (usernameDiff < 30) {
+          usernameTimer.textContent = `can change in ${30 - usernameDiff} days`;
+          $('edit-username').disabled = true;
+        } else {
+          usernameTimer.textContent = '';
+          $('edit-username').disabled = false;
+        }
+      }
     }
 
     async function saveProfile() {
       const newName = $('edit-display-name').value.trim();
+      const newUsername = $('edit-username').value.trim().replace(/[^a-zA-Z0-9_]/g, '');
       const newEmail = $('edit-email').value.trim();
       const newPassword = $('edit-password').value;
       const newAvatar = $('edit-avatar').value.trim();
       
       if (!newName) { showToast('name cannot be empty'); return; }
       
+      const { data: profile } = await sb.from('profiles').select('last_name_change, last_username_change, username').eq('id', currentUser.id).single();
+      const now = new Date().toISOString();
+      
       const updates = { name: newName };
+      const nameDiff = profile?.last_name_change ? Math.floor((Date.now() - new Date(profile.last_name_change).getTime()) / (1000 * 60 * 60 * 24)) : 999;
+      const usernameDiff = profile?.last_username_change ? Math.floor((Date.now() - new Date(profile.last_username_change).getTime()) / (1000 * 60 * 60 * 24)) : 999;
+      
+      if (newName !== currentUser.name && nameDiff >= 3) {
+        updates.last_name_change = now;
+      } else if (newName !== currentUser.name && nameDiff < 3) {
+        showToast('display name can only be changed every 3 days');
+        return;
+      }
+      
+      if (newUsername && newUsername !== profile?.username && usernameDiff >= 30) {
+        updates.username = newUsername;
+        updates.last_username_change = now;
+      } else if (newUsername && newUsername !== profile?.username && usernameDiff < 30) {
+        showToast('username can only be changed every 30 days');
+        return;
+      }
+      
       if (newAvatar) updates.avatar = newAvatar;
       
       await sb.from('profiles').update(updates).eq('id', currentUser.id);
@@ -1446,6 +1500,7 @@
       }
       
       currentUser.name = newName;
+      currentUser.username = newUsername || currentUser.username;
       currentUser.avatar = newAvatar;
       
       $('edit-profile-section').style.display = 'none';
