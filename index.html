@@ -106,7 +106,6 @@
     .story {
       padding: 16px 0;
       border-bottom: 1px solid rgba(255,255,255,0.07);
-      cursor: pointer;
     }
     .story-header {
       display: flex;
@@ -131,14 +130,10 @@
     .author { font-weight: 600; font-size: 14px; }
     .title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
     .preview {
-      font-size: 20px;
+      font-size: 16px;
       color: #ffffff;
       line-height: 1.6;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
     .reactions {
       display: flex;
@@ -772,11 +767,11 @@
               <div class="profile-stat-value" id="user-stat-stories">0</div>
               <div class="profile-stat-label">stories</div>
             </div>
-            <div class="profile-stat" style="cursor:pointer;" onclick="setUserProfileTab('followers')">
+            <div class="profile-stat" style="cursor:pointer;" id="followers-stat" data-userid="">
               <div class="profile-stat-value" id="user-stat-followers">0</div>
               <div class="profile-stat-label">followers</div>
             </div>
-            <div class="profile-stat" style="cursor:pointer;" onclick="setUserProfileTab('following')">
+            <div class="profile-stat" style="cursor:pointer;" id="following-stat" data-userid="">
               <div class="profile-stat-value" id="user-stat-following">0</div>
               <div class="profile-stat-label">following</div>
             </div>
@@ -784,8 +779,6 @@
         </div>
         <div class="inbox-tabs" id="user-profile-tabs" style="display:none;">
           <button class="inbox-tab active" onclick="setUserProfileTab('stories')">stories</button>
-          <button class="inbox-tab" onclick="setUserProfileTab('followers')">followers</button>
-          <button class="inbox-tab" onclick="setUserProfileTab('following')">following</button>
         </div>
         <div class="stories" id="user-stories-container"></div>
       </div>
@@ -800,11 +793,11 @@
               <div class="profile-stat-value" id="stat-stories">0</div>
               <div class="profile-stat-label">stories</div>
             </div>
-            <div class="profile-stat" style="cursor:pointer;" onclick="setMyProfileTab('followers')">
+            <div class="profile-stat" style="cursor:pointer;" onclick="window.location.hash='/followers'">
               <div class="profile-stat-value" id="stat-followers">0</div>
               <div class="profile-stat-label">followers</div>
             </div>
-            <div class="profile-stat" style="cursor:pointer;" onclick="setMyProfileTab('following')">
+            <div class="profile-stat" style="cursor:pointer;" onclick="window.location.hash='/following'">
               <div class="profile-stat-value" id="stat-following">0</div>
               <div class="profile-stat-label">following</div>
             </div>
@@ -812,8 +805,8 @@
         </div>
         <div class="inbox-tabs">
           <button class="inbox-tab active" onclick="setMyProfileTab('stories')">stories</button>
-          <button class="inbox-tab" onclick="setMyProfileTab('followers')">followers</button>
-          <button class="inbox-tab" onclick="setMyProfileTab('following')">following</button>
+          <button class="inbox-tab" onclick="setMyProfileTab('likes')">likes</button>
+          <button class="inbox-tab" onclick="setMyProfileTab('saves')">saves</button>
         </div>
         <div id="my-profile-content"></div>
         <div id="edit-profile-section" style="display:none;margin:16px;padding:16px;background:var(--bg-secondary);border-radius:12px;">
@@ -857,6 +850,26 @@
           </div>
           <input type="text" class="search-input" id="admin-search" placeholder="search users..." oninput="filterAdminUsers(this.value)" style="display:none;margin-bottom:12px;">
           <div id="admin-results"></div>
+        </div>
+      </div>
+
+      <div class="screen" id="followers-screen" style="display:none;">
+        <div style="padding:16px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <button class="back-btn" onclick="window.history.back()">←</button>
+            <h2 id="followers-title" style="font-size:18px;font-weight:700;color:#fff;">Followers</h2>
+          </div>
+          <div id="followers-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+      </div>
+
+      <div class="screen" id="following-screen" style="display:none;">
+        <div style="padding:16px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <button class="back-btn" onclick="window.history.back()">←</button>
+            <h2 id="following-title" style="font-size:18px;font-weight:700;color:#fff;">Following</h2>
+          </div>
+          <div id="following-list" style="display:flex;flex-direction:column;gap:8px;"></div>
         </div>
       </div>
     </main>
@@ -968,6 +981,7 @@
     let currentTab = 'trending';
     let currentStory = null;
     let allStories = [];
+    let allComments = {};
     let searchQuery = '';
     let userRoles = {};
     let following = [];
@@ -1031,7 +1045,8 @@
     function goToScreen(screen, updateHash = true) {
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.querySelector(`.nav-btn[data-screen="${screen}"]`).classList.add('active');
+      const navBtn = document.querySelector(`.nav-btn[data-screen="${screen}"]`);
+      if (navBtn) navBtn.classList.add('active');
       $(`${screen}-screen`).classList.add('active');
       if (screen === 'inbox') loadInbox();
       if (screen === 'profile') updateProfile();
@@ -1053,7 +1068,7 @@
       if (trendingTab) trendingTab.classList.add('active');
       currentTab = 'trending';
 
-      const screenMap = { 'feed': 'feed', 'write': 'publish', 'inbox': 'inbox', 'profile': 'profile', 'admin': 'admin' };
+      const screenMap = { 'feed': 'feed', 'write': 'publish', 'inbox': 'inbox', 'profile': 'profile', 'admin': 'admin', 'followers': 'followers', 'following': 'following' };
 
       if (route === 'story' && parts[1]) {
         closeAllModals();
@@ -1065,6 +1080,18 @@
         const userId = parts[1];
         const userName = parts[2] || 'author';
         viewUserProfile(userId, decodeURIComponent(userName));
+        return;
+      }
+
+      if (route === 'followers') {
+        closeAllModals();
+        loadFollowersPage(parts[1]);
+        return;
+      }
+
+      if (route === 'following') {
+        closeAllModals();
+        loadFollowingPage(parts[1]);
         return;
       }
 
@@ -1126,7 +1153,7 @@
           }
         } catch(e) { console.log('Profiles load skipped'); }
         
-        // Load user reactions for like button state
+        // Load like button state
         if (currentUser) {
           allStories.forEach(s => {
             if (s.user_reactions && s.user_reactions[currentUser.id] === 'like') {
@@ -1143,6 +1170,16 @@
           }
         }
         
+        // Load all comments
+        const { data: commentsData } = await sb.from('comments').select('*').order('created_at', { ascending: false });
+        allComments = {};
+        if (commentsData) {
+          commentsData.forEach(c => {
+            if (!allComments[c.story_id]) allComments[c.story_id] = [];
+            allComments[c.story_id].push(c);
+          });
+        }
+        
         renderStories();
       } catch(e) {
         container.innerHTML = `<div class="empty"><h3>error loading</h3><p>${e.message}</p></div>`;
@@ -1155,11 +1192,6 @@
       return text.replace(regex, '<mark style="background:#ffd700;color:#000;padding:0 2px;border-radius:2px;">$1</mark>');
     }
 
-    function getTotalReactions(story) {
-      const r = story.reactions || { heart: 0, fire: 0, scream: 0, laugh: 0, cry: 0 };
-      return r.heart + r.fire + r.scream + r.laugh + r.cry;
-    }
-
     function renderStories() {
       const container = $('stories-container');
       let stories = [...allStories];
@@ -1168,10 +1200,6 @@
       else if (currentTab === 'finished') stories = stories.filter(s => s.is_finished);
       else if (currentTab === 'trending') {
         stories = allStories;
-      }
-      
-      if (currentTab === 'trending') {
-        stories.sort((a, b) => getTotalReactions(b) - getTotalReactions(a));
       }
       
       if (searchQuery) {
@@ -1216,66 +1244,73 @@
         html += `<h4 style="font-size:12px;color:var(--text-secondary);margin:16px 0 8px;">stories</h4>`;
         html += stories.map(s => {
         const catColor = s.category === 'scary' ? '#dc3545' : s.category === 'finished' ? '#198754' : '#1d9bf0';
+        const contentPreview = s.content.length > 200 ? s.content.substring(0, 200) + '...' : s.content;
+        const storyComments = (allComments[s.id] || []);
         return `
-        <div class="story" onclick="openStory('${s.id}')">
+        <div class="story" id="story-card-${s.id}">
           <div class="story-header">
             ${getAvatarHTML(s.author_id, s.author_name)}
-            <span class="author" onclick="event.stopPropagation(); viewUserProfile('${s.author_id}', '${s.author_name}')" style="cursor:pointer;">${isSearching ? highlightText(s.author_name, searchQuery) : s.author_name}<span style="color:#ffd700;">${getBadge(s.author_id)}</span>${(currentTab === 'trending') ? `<span style="font-size:10px;padding:2px 6px;background:${catColor};border-radius:4px;margin-left:6px;color:#fff;">${s.category}</span>` : ''}</span>
+            <span class="author" onclick="viewUserProfile('${s.author_id}', '${s.author_name}')" style="cursor:pointer;">${isSearching ? highlightText(s.author_name, searchQuery) : s.author_name}<span style="color:#ffd700;">${getBadge(s.author_id)}</span>${(currentTab === 'trending') ? `<span style="font-size:10px;padding:2px 6px;background:${catColor};border-radius:4px;margin-left:6px;color:#fff;">${s.category}</span>` : ''}</span>
           </div>
           <h3 class="title">${isSearching ? highlightText(s.title, searchQuery) : s.title}</h3>
-          <p class="preview">${isSearching ? highlightText(s.content, searchQuery) : s.content}</p>
+          <div class="story-content-preview" id="content-preview-${s.id}">
+            <p class="preview">${isSearching ? highlightText(contentPreview, searchQuery) : contentPreview}</p>
+            ${s.content.length > 200 ? `<button onclick="toggleStoryContent('${s.id}')" style="background:none;border:none;color:#1d9bf0;cursor:pointer;font-size:14px;padding:0;" id="see-more-${s.id}">see more...</button>` : ''}
+          </div>
+          <div class="story-content-full" id="content-full-${s.id}" style="display:none;">
+            <p class="preview">${isSearching ? highlightText(s.content, searchQuery) : s.content}</p>
+            ${s.content.length > 200 ? `<button onclick="toggleStoryContent('${s.id}')" style="background:none;border:none;color:#1d9bf0;cursor:pointer;font-size:14px;padding:0;" id="see-less-${s.id}">see less</button>` : ''}
+          </div>
+          ${!s.is_finished ? '<button class="finish-btn" onclick="openFinishModal(\'' + s.id + '\')" style="margin-bottom:12px;">finish this story</button>' : ''}
           <div class="reactions">
-            <div style="position:relative;display:inline-block;">
-              <button class="reaction" onclick="event.stopPropagation(); toggleReactions(this, '${s.id}')">😀<sup style="font-size:10px;">+</sup> <span style="font-size:11px;">${Object.values(s.reactions || {}).reduce((a, b) => a + b, 0)}</span></button>
-              <div class="reactions-popup" style="display:none;position:absolute;bottom:100%;left:0;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:12px;padding:12px;margin-bottom:8px;z-index:100;min-width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
-                <input type="text" class="form-input" placeholder="search emoji..." onkeyup="filterEmojis(this, '${s.id}')" style="font-size:12px;margin-bottom:8px;padding:8px;">
-                <div class="emoji-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;">
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '❤️', this)">❤️</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🔥', this)">🔥</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '😱', this)">😱</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '😂', this)">😂</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '😍', this)">😍</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🥰', this)">🥰</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '😢', this)">😢</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '😡', this)">😡</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🤔', this)">🤔</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '✨', this)">✨</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '💀', this)">💀</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🤡', this)">🤡</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '💯', this)">💯</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🙌', this)">🙌</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '👏', this)">👏</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🎉', this)">🎉</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🥺', this)">🥺</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '😎', this)">😎</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🤩', this)">🤩</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '😭', this)">😭</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '😤', this)">😤</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🥳', this)">🥳</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '😴', this)">😴</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🤯', this)">🤯</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '👍', this)">👍</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '👎', this)">👎</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🌟', this)">🌟</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '💔', this)">💔</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '💪', this)">💪</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${s.id}', '🫶', this)">🫶</button>
-                </div>
-              </div>
+            <button class="reaction ${likedStories[s.id] ? 'active' : ''}" onclick="event.stopPropagation(); toggleLike('${s.id}')" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;font-size:14px;">
+              <span style="font-size:18px;transition:transform 0.2s;">${likedStories[s.id] ? '❤️' : '🤍'}</span>
+              <span style="color:#71767b;font-weight:500;">${getLikeCount(s)}</span>
+            </button>
+            <button class="reaction ${bookmarked.includes(s.id) ? 'active' : ''}" onclick="event.stopPropagation(); toggleBookmark('${s.id}')" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;font-size:14px;">
+              <span style="font-size:18px;color:${bookmarked.includes(s.id) ? '#ffd700' : '#71767b'};">${bookmarked.includes(s.id) ? '🔖' : '📑'}</span>
+              <span style="color:#71767b;font-weight:500;">${getBookmarkCount(s)}</span>
+            </button>
+            <button class="reaction" onclick="event.stopPropagation(); toggleComments('${s.id}')" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;font-size:14px;">
+              <span style="font-size:18px;">💬</span>
+              <span style="color:#71767b;font-weight:500;">${s.comment_count || 0}</span>
+            </button>
+            <button class="reaction" onclick="event.stopPropagation(); shareStory('${s.id}')" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;font-size:14px;">
+              <span style="font-size:18px;">↗️</span>
+            </button>
+          </div>
+          <div class="story-comments" id="comments-${s.id}" style="display:none;padding:12px 0;border-top:1px solid rgba(255,255,255,0.07);">
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <input type="text" id="comment-input-${s.id}" placeholder="add a comment..." style="flex:1;padding:8px 12px;background:var(--bg-secondary);border:none;border-radius:16px;color:#fff;font-size:13px;" onkeypress="if(event.key==='Enter')submitComment('${s.id}')"
+              <button onclick="submitComment('${s.id}')" style="padding:8px 12px;background:#1d9bf0;border:none;border-radius:16px;color:#fff;font-size:12px;cursor:pointer;">post</button>
             </div>
-            <button class="reaction" onclick="event.stopPropagation(); shareStory('${s.id}')" title="share">↗️</button>
-            <button class="like-btn ${likedStories[s.id] ? 'active' : ''}" onclick="event.stopPropagation(); toggleLike('${s.id}')">
-              <svg viewBox="0 0 24 24"><path d="M7.5 2.25C10.5 2.25 12 4.25 12 4.25C12 4.25 13.5 2.25 16.5 2.25C20 2.25 22.5 4.99999 22.5 8.5C22.5 12.5 19.2311 16.0657 16.25 18.75C14.4095 20.4072 13 21.5 12 21.5C11 21.5 9.55051 20.3989 7.75 18.75C4.81949 16.0662 1.5 12.5 1.5 8.5C1.5 4.99999 4 2.25 7.5 2.25Z"/></svg>
-              <span class="count">${getLikeCount(s)}</span>
-            </button>
-            <button class="bookmark-btn ${bookmarked.includes(s.id) ? 'active' : ''}" onclick="event.stopPropagation(); toggleBookmark('${s.id}')">
-              <svg viewBox="0 0 24 24"><path d="M4.5 2.25A2 2 0 0 1 6.5 0.25h12a2 2 0 0 1 2 2v15.13a1 1 0 0 1-1.555.831l-6.167-4.12a.5.5 0 0 0-.556 0l-6.167 4.12A1 1 0 0 1 4 19.63z"/></svg>
-              <span class="count">${getBookmarkCount(s)}</span>
-            </button>
-            <button class="action-btn" onclick="event.stopPropagation(); openStory('${s.id}')">
-              <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-              <span class="count">${s.comment_count || 0}</span>
-            </button>
+            <div class="comments-list" id="comments-list-${s.id}">
+              ${(storyComments).slice(0, 5).map(c => {
+                const canDelete = (currentUser && currentUser.id === c.author_id) || isAdmin();
+                return `
+                <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                    <a href="#/user/${c.author_id}/${encodeURIComponent(c.author_name)}" class="comment-avatar" style="display:inline-flex;width:20px;height:20px;border-radius:50%;background:#333;color:#fff;align-items:center;justify-content:center;margin-right:6px;text-decoration:none;">
+                      ${getInitials(c.author_name)}
+                    </a>
+                    <a href="#/user/${c.author_id}/${encodeURIComponent(c.author_name)}" class="comment-author" style="font-weight:600;font-size:12px;color:#e7e7e7;text-decoration:none;">${c.author_name}</a>
+                    <span style="font-size:10px;color:#71767b;">${formatTime(c.created_at)}</span>
+                    ${canDelete ? `<button onclick="deleteCommentInline('${c.id}','${s.id}')" style="background:none;border:none;color:#dc3545;font-size:10px;cursor:pointer;margin-left:auto;">del</button>` : ''}
+                  </div>
+                  <p style="font-size:14px;color:#ffffff;line-height:1.4;">${c.content}</p>
+                  <button style="background:none;border:none;color:#1d9bf0;font-size:13px;cursor:pointer;padding:6px 8px;" onclick="showInlineReplyForm('${c.id}','${s.id}')">reply</button>
+                  <div class="reply-form" id="inline-reply-${c.id}" style="display:none;margin-top:8px;">
+                    <input type="text" id="inline-reply-text-${c.id}" placeholder="write a reply..." style="width:100%;padding:8px;background:var(--bg-tertiary);border:none;border-radius:8px;color:#fff;font-size:13px;" onkeypress="if(event.key==='Enter')submitInlineReply('${c.id}','${s.id}')">
+                    <div style="display:flex;gap:8px;margin-top:8px;">
+                      <button onclick="hideInlineReplyForm('${c.id}')" style="padding:6px 12px;background:var(--bg-tertiary);border:none;border-radius:8px;color:#71767b;cursor:pointer;font-size:12px;">cancel</button>
+                      <button onclick="submitInlineReply('${c.id}','${s.id}')" style="padding:6px 12px;background:#1d9bf0;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:12px;">reply</button>
+                    </div>
+                  </div>
+                  ${(c.replies || []).length > 0 ? '<div style="margin-left:12px;margin-top:8px;padding-left:12px;border-left:2px solid rgba(255,255,255,0.1);">' + renderInlineRepliesRecursive(c.replies, s.id, 1).join('') + '</div>' : ''}
+                </div>
+              `}).join('')}
+              ${(storyComments).length > 5 ? `<p style="font-size:12px;color:#71767b;padding:8px 0;">view all ${storyComments.length} comments</p>` : ''}
+            </div>
           </div>
         </div>
       `}).join('');
@@ -1292,6 +1327,176 @@
       } catch(e) {
         showToast('failed to copy');
       }
+    }
+    
+    function toggleComments(storyId) {
+      const commentsDiv = $('comments-' + storyId);
+      if (commentsDiv.style.display === 'none') {
+        commentsDiv.style.display = 'block';
+      } else {
+        commentsDiv.style.display = 'none';
+      }
+    }
+    
+    function toggleStoryContent(storyId) {
+      const preview = $('content-preview-' + storyId);
+      const full = $('content-full-' + storyId);
+      if (preview.style.display === 'none') {
+        preview.style.display = 'block';
+        full.style.display = 'none';
+      } else {
+        preview.style.display = 'none';
+        full.style.display = 'block';
+      }
+    }
+    
+    async function submitComment(storyId) {
+      if (!currentUser) { showLoginModal(); return; }
+      const input = $('comment-input-' + storyId);
+      const content = input.value.trim();
+      if (!content) return;
+      
+      const newComment = {
+        story_id: storyId, author_id: currentUser.id, author_name: currentUser.name,
+        content, is_story_ending: false, likes: 0, is_pinned: false, replies: [], created_at: new Date().toISOString()
+      };
+      
+      await sb.from('comments').insert(newComment);
+      
+      if (!allComments[storyId]) allComments[storyId] = [];
+      allComments[storyId].unshift(newComment);
+      
+      const story = allStories.find(s => s.id === storyId);
+      if (story) {
+        await sb.from('stories').update({ comment_count: (story.comment_count || 0) + 1 }).eq('id', storyId);
+        story.comment_count = (story.comment_count || 0) + 1;
+      }
+      
+      input.value = '';
+      showToast('comment added!');
+      
+      const commentsList = $('comments-list-' + storyId);
+      if (commentsList) {
+        const storyComments = allComments[storyId] || [];
+        commentsList.innerHTML = storyComments.slice(0, 5).map(c => `
+          <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+              <span style="font-weight:600;font-size:12px;color:#e7e7e7;">${c.author_name}</span>
+              <span style="font-size:10px;color:#71767b;">${formatTime(c.created_at)}</span>
+            </div>
+            <p style="font-size:14px;color:#ffffff;line-height:1.4;">${c.content}</p>
+            <button style="background:none;border:none;color:#1d9bf0;font-size:13px;cursor:pointer;padding:6px 8px;" onclick="showInlineReplyForm('${c.id}','${storyId}')">reply</button>
+            <div class="reply-form" id="inline-reply-${c.id}" style="display:none;margin-top:8px;">
+              <input type="text" id="inline-reply-text-${c.id}" placeholder="write a reply..." style="width:100%;padding:8px;background:var(--bg-tertiary);border:none;border-radius:8px;color:#fff;font-size:13px;" onkeypress="if(event.key==='Enter')submitInlineReply('${c.id}','${storyId}')">
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <button onclick="hideInlineReplyForm('${c.id}')" style="padding:6px 12px;background:var(--bg-tertiary);border:none;border-radius:8px;color:#71767b;cursor:pointer;font-size:12px;">cancel</button>
+                <button onclick="submitInlineReply('${c.id}','${storyId}')" style="padding:6px 12px;background:#1d9bf0;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:12px;">reply</button>
+              </div>
+            </div>
+            ${(c.replies || []).length > 0 ? '<div style="margin-left:12px;margin-top:8px;padding-left:12px;border-left:2px solid rgba(255,255,255,0.1);">' + renderInlineRepliesRecursive(c.replies.slice(0, 3), storyId, 1).join('') + '</div>' : ''}
+          </div>
+        `).join('') + (storyComments.length > 5 ? '<p style="font-size:12px;color:#71767b;padding:8px 0;">view all ' + storyComments.length + ' comments</p>' : '');
+      }
+    }
+
+    function showInlineReplyForm(commentId, storyId) {
+      const form = $('inline-reply-' + commentId);
+      document.querySelectorAll('.reply-form').forEach(f => f.style.display = 'none');
+      if (form) form.style.display = 'block';
+    }
+
+    function hideInlineReplyForm(commentId) {
+      const form = $('inline-reply-' + commentId);
+      if (form) form.style.display = 'none';
+    }
+
+    async function submitInlineReply(commentId, storyId) {
+      if (!currentUser) { showLoginModal(); return; }
+      const input = $('inline-reply-text-' + commentId);
+      const content = input.value.trim();
+      if (!content) return;
+      
+      const reply = {
+        id: Date.now().toString(),
+        author_id: currentUser.id,
+        author_name: currentUser.name,
+        content,
+        created_at: new Date().toISOString()
+      };
+      
+      const comment = allComments[storyId]?.find(c => c.id === commentId);
+      if (comment) {
+        if (!comment.replies) comment.replies = [];
+        comment.replies.push(reply);
+        await sb.from('comments').update({ replies: comment.replies }).eq('id', commentId);
+      }
+      
+      hideInlineReplyForm(commentId);
+      input.value = '';
+      showToast('reply added!');
+      
+      const { data: commentsData } = await sb.from('comments').select('*').eq('story_id', storyId);
+      if (commentsData) {
+        allComments[storyId] = commentsData;
+      }
+      
+      renderStories();
+      
+      const commentsDiv = $('comments-' + storyId);
+      if (commentsDiv) commentsDiv.style.display = 'block';
+    }
+
+    function renderInlineRepliesRecursive(replies, storyId, depth) {
+      if (!replies || depth > 3) return [''];
+      return replies.map(r => {
+        const canDelete = (currentUser && currentUser.id === r.author_id) || isAdmin();
+        return `
+        <div style="padding:4px 0;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+            <span style="font-weight:600;font-size:11px;color:#e7e7e7;">${r.author_name}</span>
+            <span style="font-size:9px;color:#71767b;">${formatTime(r.created_at)}</span>
+            ${canDelete ? `<button onclick="deleteReplyInline('${r.id}','${storyId}')" style="background:none;border:none;color:#dc3545;font-size:9px;cursor:pointer;margin-left:auto;">del</button>` : ''}
+          </div>
+          <p style="font-size:13px;color:#cccccc;line-height:1.3;">${r.content}</p>
+          <button style="background:none;border:none;color:#1d9bf0;font-size:12px;cursor:pointer;padding:4px 6px;" onclick="showInlineReplyForm('${r.id}','${storyId}')">reply</button>
+          <div class="reply-form" id="inline-reply-${r.id}" style="display:none;margin-top:4px;">
+            <input type="text" id="inline-reply-text-${r.id}" placeholder="write a reply..." style="width:100%;padding:6px;background:var(--bg-tertiary);border:none;border-radius:6px;color:#fff;font-size:12px;" onkeypress="if(event.key==='Enter')submitInlineReply('${r.id}','${storyId}')">
+            <div style="display:flex;gap:4px;margin-top:4px;">
+              <button onclick="hideInlineReplyForm('${r.id}')" style="padding:4px 8px;background:var(--bg-tertiary);border:none;border-radius:6px;color:#71767b;cursor:pointer;font-size:11px;">cancel</button>
+              <button onclick="submitInlineReply('${r.id}','${storyId}')" style="padding:4px 8px;background:#1d9bf0;border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:11px;">reply</button>
+            </div>
+          </div>
+          ${(r.replies || []).length > 0 ? '<div style="margin-left:8px;margin-top:4px;padding-left:8px;border-left:1px solid rgba(255,255,255,0.1);">' + renderInlineRepliesRecursive(r.replies, storyId, depth + 1).join('') + '</div>' : ''}
+        </div>
+      `});
+    }
+
+    async function deleteCommentInline(commentId, storyId) {
+      if (!confirm('delete this comment?')) return;
+      await sb.from('comments').delete().eq('id', commentId);
+      const story = allStories.find(s => s.id === storyId);
+      if (story) {
+        story.comment_count = Math.max(0, (story.comment_count || 0) - 1);
+        await sb.from('stories').update({ comment_count: story.comment_count }).eq('id', storyId);
+      }
+      showToast('comment deleted');
+      renderStories();
+    }
+
+    async function deleteReplyInline(replyId, storyId) {
+      if (!confirm('delete this reply?')) return;
+      for (const comment of (allComments[storyId] || [])) {
+        if (comment.replies) {
+          const index = comment.replies.findIndex(r => r.id === replyId);
+          if (index !== -1) {
+            comment.replies.splice(index, 1);
+            await sb.from('comments').update({ replies: comment.replies }).eq('id', comment.id);
+            break;
+          }
+        }
+      }
+      showToast('reply deleted');
+      renderStories();
     }
 
     async function toggleLike(storyId) {
@@ -1331,49 +1536,108 @@
       }
     }
 
-    function toggleReactions(btn, storyId) {
-      document.querySelectorAll('.reactions-popup').forEach(p => p.style.display = 'none');
-      const popup = btn.parentElement.querySelector('.reactions-popup');
-      popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function filterEmojis(input, storyId) {
-      const query = input.value.toLowerCase();
-      const buttons = input.parentElement.querySelectorAll('.reaction');
-      buttons.forEach(btn => {
-        btn.style.display = query === '' ? 'inline-block' : 'inline-block';
-      });
-    }
-
-    async function addReaction(storyId, emoji, btn) {
-      if (!currentUser) { showLoginModal(); return; }
-      const story = allStories.find(s => s.id === storyId);
-      if (!story) return;
+    async function loadFollowersPage(userId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      const fscreen = $('followers-screen');
+      if (fscreen) fscreen.classList.add('active');
       
-      if (!story.reactions) story.reactions = {};
-      if (!story.reactions[emoji]) story.reactions[emoji] = 0;
-      story.reactions[emoji]++;
-      
-      await sb.from('stories').update({ reactions: story.reactions }).eq('id', storyId);
-      
-      btn.parentElement.parentElement.style.display = 'none';
-      renderStories();
-    }
-
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.reactions-popup') && !e.target.closest('.reaction')) {
-        document.querySelectorAll('.reactions-popup').forEach(p => p.style.display = 'none');
+      const targetUserId = userId || currentUser?.id;
+      if (!targetUserId) {
+        $('followers-list').innerHTML = '<div class="empty"><h3>sign in to see followers</h3></div>';
+        return;
       }
-    });
+      
+      const { data: profile } = await sb.from('profiles').select('*').eq('id', targetUserId).single();
+      const followersIds = profile?.following || [];
+      
+      const { data: allProfiles } = await sb.from('profiles').select('*');
+      const followers = allProfiles ? allProfiles.filter(p => p.following?.includes(targetUserId)) : [];
+      
+      if (targetUserId !== currentUser?.id) {
+        const userProfile = allProfiles?.find(p => p.id === targetUserId);
+        const uname = userProfile?.name || 'user';
+        $('followers-title').textContent = `${uname}'s followers`;
+      } else {
+        $('followers-title').textContent = 'Followers';
+      }
+      
+      if (followers.length === 0) {
+        $('followers-list').innerHTML = '<div class="empty"><h3>no followers yet</h3></div>';
+      } else {
+        $('followers-list').innerHTML = followers.map(u => `
+          <div class="inbox-item" onclick="window.location.hash='/user/${u.id}/${encodeURIComponent(u.name)}'" style="cursor:pointer;padding:12px;background:var(--bg-secondary);border-radius:12px;">
+            <div class="avatar" style="width:44px;height:44px;font-size:14px;display:inline-block;">${getInitials(u.name)}</div>
+            <div style="display:inline-block;vertical-align:middle;margin-left:12px;">
+              <p style="font-weight:600;font-size:14px;margin:0;">${u.name}<span style="color:#ffd700;">${getBadge(u.id)}</span></p>
+              <p style="font-size:12px;color:#71767b;margin:0;">@${(u.username || u.name).toLowerCase().replace(/\s+/g, '_')}</p>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    async function loadFollowingPage(userId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      const fscreen = $('following-screen');
+      if (fscreen) fscreen.classList.add('active');
+      
+      const targetUserId = userId || currentUser?.id;
+      if (!targetUserId) {
+        $('following-list').innerHTML = '<div class="empty"><h3>sign in to see following</h3></div>';
+        return;
+      }
+      
+      const { data: profile } = await sb.from('profiles').select('*').eq('id', targetUserId).single();
+      const followingIds = profile?.following || [];
+      
+      const { data: allProfiles } = await sb.from('profiles').select('*');
+      const following = allProfiles ? allProfiles.filter(p => followingIds.includes(p.id)) : [];
+      
+      if (targetUserId !== currentUser?.id) {
+        const userProfile = allProfiles?.find(p => p.id === targetUserId);
+        const uname = userProfile?.name || 'user';
+        $('following-title').textContent = `${uname}'s following`;
+      } else {
+        $('following-title').textContent = 'Following';
+      }
+      
+      if (following.length === 0) {
+        $('following-list').innerHTML = '<div class="empty"><h3>not following anyone</h3><p>visit author profiles to follow them</p></div>';
+      } else {
+        $('following-list').innerHTML = following.map(u => `
+          <div class="inbox-item" onclick="window.location.hash='/user/${u.id}/${encodeURIComponent(u.name)}'" style="cursor:pointer;padding:12px;background:var(--bg-secondary);border-radius:12px;">
+            <div class="avatar" style="width:44px;height:44px;font-size:14px;display:inline-block;">${getInitials(u.name)}</div>
+            <div style="display:inline-block;vertical-align:middle;margin-left:12px;">
+              <p style="font-weight:600;font-size:14px;margin:0;">${u.name}<span style="color:#ffd700;">${getBadge(u.id)}</span></p>
+              <p style="font-size:12px;color:#71767b;margin:0;">@${(u.username || u.name).toLowerCase().replace(/\s+/g, '_')}</p>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
 
     async function viewUserProfile(userId, userName) {
-      window.location.hash = `/user/${userId}/${encodeURIComponent(userName)}`;
+      // Resolve a proper display name if not provided
+      if (!userName) {
+        const { data: profileName } = await sb.from('profiles').select('name').eq('id', userId).single();
+        userName = profileName?.name || 'user';
+      }
+      // Resolve a meaningful display name if the slug is generic (e.g. 'author')
+      let displayName = userName;
+      if (!displayName || displayName.toLowerCase() === 'author') {
+        const { data: profileName } = await sb.from('profiles').select('name').eq('id', userId).single();
+        displayName = profileName?.name || 'user';
+      }
+      window.location.hash = `/user/${userId}/${encodeURIComponent(displayName)}`;
       
       const userStories = allStories.filter(s => s.author_id === userId);
       const { data: comments } = await sb.from('comments').select('*').eq('author_id', userId).eq('is_story_ending', true);
       const { data: profile } = await sb.from('profiles').select('*').eq('id', userId).single();
       
-      $('user-profile-avatar').textContent = getInitials(userName);
+      // (reuse displayName declared above)
+      $('user-profile-avatar').textContent = getInitials(displayName);
       
       // Build role badge for user profile
       const userRole = userRoles[userId];
@@ -1385,7 +1649,7 @@
       } else if (userRole?.role === 'mod') {
         userRoleBadge = '<br><span class="profile-role-badge" title="Mod.">🔨</span>';
       }
-      $('user-profile-name').innerHTML = userName + userRoleBadge;
+      $('user-profile-name').innerHTML = displayName + userRoleBadge;
       $('user-profile-handle').textContent = '@' + (profile?.username || userName).toLowerCase().replace(/\s+/g, '_');
       $('user-stat-stories').textContent = userStories.length;
       
@@ -1401,6 +1665,9 @@
       }
       $('user-stat-followers').textContent = followersIds.length;
       $('user-stat-following').textContent = followingIds.length;
+      
+      $('followers-stat').onclick = () => window.location.hash = `/followers/${userId}`;
+      $('following-stat').onclick = () => window.location.hash = `/following/${userId}`;
       
       // Follow button
       let isFollowing = false;
@@ -1422,9 +1689,6 @@
             </div>
             <h3 class="title">${s.title}</h3>
             <p class="preview">${s.content}</p>
-            <div class="reactions">
-              <button class="reaction">😀 <span style="font-size:11px;">${Object.values(s.reactions || {}).reduce((a, b) => a + b, 0)}</span></button>
-            </div>
           </div>
         `).join('');
       }
@@ -1462,26 +1726,15 @@
 
     async function setUserProfileTab(tab) {
       document.querySelectorAll('#user-profile-tabs .inbox-tab').forEach(t => t.classList.remove('active'));
-      const tabBtn = document.querySelector(`#user-profile-tabs .inbox-tab${tab === 'stories' ? ':first-child' : tab === 'followers' ? ':nth-child(2)' : ':nth-child(3)'}`);
+      const tabs = ['stories'];
+      const tabIndex = tabs.indexOf(tab);
+      const tabBtn = document.querySelector(`#user-profile-tabs .inbox-tab:nth-child(${tabIndex + 1})`);
       if (tabBtn) tabBtn.classList.add('active');
       
       const hash = window.location.hash;
       const userId = hash.split('/')[2];
       
       const userStories = allStories.filter(s => s.author_id === userId);
-      const { data: profile } = await sb.from('profiles').select('*').eq('id', userId).single();
-      const followingIds = profile?.following || [];
-      const followersIds = [];
-      
-      const { data: allProfiles } = await sb.from('profiles').select('*');
-      if (allProfiles) {
-        allProfiles.forEach(p => {
-          if (p.following && p.following.includes(userId)) {
-            followersIds.push(p.id);
-          }
-        });
-      }
-      
       const container = $('user-stories-container');
       
       if (tab === 'stories') {
@@ -1496,39 +1749,6 @@
               </div>
               <h3 class="title">${s.title}</h3>
               <p class="preview">${s.content}</p>
-              <div class="reactions">
-                <button class="reaction">😀 <span style="font-size:11px;">${Object.values(s.reactions || {}).reduce((a, b) => a + b, 0)}</span></button>
-              </div>
-            </div>
-          `).join('');
-        }
-      } else if (tab === 'followers') {
-        if (followersIds.length === 0) {
-          container.innerHTML = '<div class="empty"><h3>no followers yet</h3></div>';
-        } else {
-          const followersProfiles = allProfiles ? allProfiles.filter(p => followersIds.includes(p.id)) : [];
-          container.innerHTML = followersProfiles.map(u => `
-            <div class="inbox-item" onclick="viewUserProfile('${u.id}', '${u.name}')" style="cursor:pointer;">
-              <div class="avatar" style="width:44px;height:44px;font-size:14px;">${getInitials(u.name)}</div>
-              <div class="inbox-content">
-                <p class="inbox-text"><strong>${u.name}<span style="color:#ffd700;">${getBadge(u.id)}</span></strong></p>
-                <span class="inbox-time">@${(u.username || u.name).toLowerCase().replace(/\s+/g, '_')}</span>
-              </div>
-            </div>
-          `).join('');
-        }
-      } else if (tab === 'following') {
-        if (followingIds.length === 0) {
-          container.innerHTML = '<div class="empty"><h3>not following anyone</h3></div>';
-        } else {
-          const followingProfiles = allProfiles ? allProfiles.filter(p => followingIds.includes(p.id)) : [];
-          container.innerHTML = followingProfiles.map(u => `
-            <div class="inbox-item" onclick="viewUserProfile('${u.id}', '${u.name}')" style="cursor:pointer;">
-              <div class="avatar" style="width:44px;height:44px;font-size:14px;">${getInitials(u.name)}</div>
-              <div class="inbox-content">
-                <p class="inbox-text"><strong>${u.name}<span style="color:#ffd700;">${getBadge(u.id)}</span></strong></p>
-                <span class="inbox-time">@${(u.username || u.name).toLowerCase().replace(/\s+/g, '_')}</span>
-              </div>
             </div>
           `).join('');
         }
@@ -1537,8 +1757,10 @@
 
     async function setMyProfileTab(tab) {
       document.querySelectorAll('#profile-screen .inbox-tab').forEach(t => t.classList.remove('active'));
-      const tabBtn = document.querySelectorAll('#profile-screen .inbox-tab')[tab === 'stories' ? 0 : tab === 'followers' ? 1 : 2];
-      if (tabBtn) tabBtn.classList.add('active');
+      const tabs = ['stories', 'likes', 'saves'];
+      const tabIndex = tabs.indexOf(tab);
+      const tabBtns = document.querySelectorAll('#profile-screen .inbox-tab');
+      if (tabBtns[tabIndex]) tabBtns[tabIndex].classList.add('active');
       
       if (!currentUser) {
         $('my-profile-content').innerHTML = '<div class="empty"><h3>sign in to see content</h3></div>';
@@ -1547,17 +1769,6 @@
       
       const myStories = allStories.filter(s => s.author_id === currentUser.id);
       const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-      const followingIds = profile?.following || [];
-      const followersIds = [];
-      
-      const { data: allProfiles } = await sb.from('profiles').select('*');
-      if (allProfiles) {
-        allProfiles.forEach(p => {
-          if (p.following && p.following.includes(currentUser.id)) {
-            followersIds.push(p.id);
-          }
-        });
-      }
       
       const container = $('my-profile-content');
       
@@ -1573,39 +1784,40 @@
               </div>
               <h3 class="title">${s.title}</h3>
               <p class="preview">${s.content}</p>
-              <div class="reactions">
-                <button class="reaction">😀 <span style="font-size:11px;">${Object.values(s.reactions || {}).reduce((a, b) => a + b, 0)}</span></button>
-              </div>
             </div>
           `).join('');
         }
-      } else if (tab === 'followers') {
-        if (followersIds.length === 0) {
-          container.innerHTML = '<div class="empty"><h3>no followers yet</h3></div>';
+      } else if (tab === 'likes') {
+        const likedStoryIds = Object.entries(likedStories).filter(([_, v]) => v).map(([id, _]) => id);
+        const likedStoriesList = allStories.filter(s => likedStoryIds.includes(s.id));
+        if (likedStoriesList.length === 0) {
+          container.innerHTML = '<div class="empty"><h3>no likes yet</h3><p>stories you like will appear here</p></div>';
         } else {
-          const followersProfiles = allProfiles ? allProfiles.filter(p => followersIds.includes(p.id)) : [];
-          container.innerHTML = followersProfiles.map(u => `
-            <div class="inbox-item" onclick="viewUserProfile('${u.id}', '${u.name}')" style="cursor:pointer;">
-              <div class="avatar" style="width:44px;height:44px;font-size:14px;">${getInitials(u.name)}</div>
-              <div class="inbox-content">
-                <p class="inbox-text"><strong>${u.name}<span style="color:#ffd700;">${getBadge(u.id)}</span></strong></p>
-                <span class="inbox-time">@${(u.username || u.name).toLowerCase().replace(/\s+/g, '_')}</span>
+          container.innerHTML = likedStoriesList.map(s => `
+            <div class="story" onclick="openStory('${s.id}')">
+              <div class="story-header">
+                <div class="avatar">${getInitials(s.author_name)}</div>
+                <span class="author">${s.author_name}<span style="color:#ffd700;">${getBadge(s.author_id)}</span></span>
               </div>
+              <h3 class="title">${s.title}</h3>
+              <p class="preview">${s.content}</p>
             </div>
           `).join('');
         }
-      } else if (tab === 'following') {
-        if (followingIds.length === 0) {
-          container.innerHTML = '<div class="empty"><h3>not following anyone</h3><p>visit author profiles to follow them</p></div>';
+      } else if (tab === 'saves') {
+        const savedIds = profile?.bookmarks || [];
+        const savedStoriesList = allStories.filter(s => savedIds.includes(s.id));
+        if (savedStoriesList.length === 0) {
+          container.innerHTML = '<div class="empty"><h3>no saved stories</h3><p>bookmark stories to save them here</p></div>';
         } else {
-          const followingProfiles = allProfiles ? allProfiles.filter(p => followingIds.includes(p.id)) : [];
-          container.innerHTML = followingProfiles.map(u => `
-            <div class="inbox-item" onclick="viewUserProfile('${u.id}', '${u.name}')" style="cursor:pointer;">
-              <div class="avatar" style="width:44px;height:44px;font-size:14px;">${getInitials(u.name)}</div>
-              <div class="inbox-content">
-                <p class="inbox-text"><strong>${u.name}<span style="color:#ffd700;">${getBadge(u.id)}</span></strong></p>
-                <span class="inbox-time">@${(u.username || u.name).toLowerCase().replace(/\s+/g, '_')}</span>
+          container.innerHTML = savedStoriesList.map(s => `
+            <div class="story" onclick="openStory('${s.id}')">
+              <div class="story-header">
+                <div class="avatar">${getInitials(s.author_name)}</div>
+                <span class="author">${s.author_name}<span style="color:#ffd700;">${getBadge(s.author_id)}</span></span>
               </div>
+              <h3 class="title">${s.title}</h3>
+              <p class="preview">${s.content}</p>
             </div>
           `).join('');
         }
@@ -1641,69 +1853,40 @@
         ${!data.is_finished ? '<button class="finish-btn" onclick="openFinishModalDirect()">finish this story</button>' : ''}
         <div class="sticky-reactions">
           <div class="reactions">
-            <div style="position:relative;display:inline-block;">
-              <button class="reaction" onclick="event.stopPropagation(); toggleReactions(this, '${id}')">😀<sup style="font-size:10px;">+</sup> <span style="font-size:11px;">${Object.values(data.reactions || {}).reduce((a, b) => a + b, 0)}</span></button>
-              <div class="reactions-popup" style="display:none;position:absolute;bottom:100%;left:0;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:12px;padding:12px;margin-bottom:8px;z-index:100;min-width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
-                <input type="text" class="form-input" placeholder="search emoji..." onkeyup="filterEmojis(this, '${id}')" style="font-size:12px;margin-bottom:8px;padding:8px;">
-                <div class="emoji-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;">
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '❤️', this)">❤️</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🔥', this)">🔥</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '😱', this)">😱</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '😂', this)">😂</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '😍', this)">😍</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🥰', this)">🥰</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '😢', this)">😢</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '😡', this)">😡</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🤔', this)">🤔</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '✨', this)">✨</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '💀', this)">💀</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🤡', this)">🤡</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '💯', this)">💯</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🙌', this)">🙌</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '👏', this)">👏</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🎉', this)">🎉</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🥺', this)">🥺</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '😎', this)">😎</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🤩', this)">🤩</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '😭', this)">😭</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '😤', this)">😤</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🥳', this)">🥳</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '😴', this)">😴</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🤯', this)">🤯</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '👍', this)">👍</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '👎', this)">👎</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🌟', this)">🌟</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '💔', this)">💔</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '💪', this)">💪</button>
-                  <button class="reaction" onclick="event.stopPropagation(); addReaction('${id}', '🫶', this)">🫶</button>
-                </div>
-              </div>
-            </div>
-            <button class="reaction" onclick="event.stopPropagation(); shareStory('${id}')" title="share">↗️</button>
-            <button class="action-btn liked ${likedStories[id] ? 'active' : ''}" onclick="event.stopPropagation(); toggleLike('${id}')">
-              <svg viewBox="0 0 24 24"><path d="M7.5 2.25C10.5 2.25 12 4.25 12 4.25C12 4.25 13.5 2.25 16.5 2.25C20 2.25 22.5 4.99999 22.5 8.5C22.5 12.5 19.2311 16.0657 16.25 18.75C14.4095 20.4072 13 21.5 12 21.5C11 21.5 9.55051 20.3989 7.75 18.75C4.81949 16.0662 1.5 12.5 1.5 8.5C1.5 4.99999 4 2.25 7.5 2.25Z"/></svg>
-              <span class="count">${getLikeCount(currentStory)}</span>
+            <button class="reaction ${likedStories[id] ? 'active' : ''}" onclick="event.stopPropagation(); toggleLike('${id}')" style="display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:24px;font-size:15px;background:${likedStories[id] ? 'rgba(254,44,85,0.1)' : 'rgba(255,255,255,0.05)'};border:1px solid ${likedStories[id] ? 'rgba(254,44,85,0.3)' : 'rgba(255,255,255,0.1)'};">
+              <span style="font-size:22px;transition:transform 0.2s;">${likedStories[id] ? '❤️' : '🤍'}</span>
+              <span style="color:${likedStories[id] ? '#fe2c55' : '#71767b'};font-weight:600;">${getLikeCount(currentStory)}</span>
             </button>
-            <button class="action-btn bookmarked ${bookmarked.includes(id) ? 'active' : ''}" onclick="event.stopPropagation(); toggleBookmark('${id}')">
-              <svg viewBox="0 0 24 24"><path d="M4.5 2.25A2 2 0 0 1 6.5 0.25h12a2 2 0 0 1 2 2v15.13a1 1 0 0 1-1.555.831l-6.167-4.12a.5.5 0 0 0-.556 0l-6.167 4.12A1 1 0 0 1 4 19.63z"/></svg>
-              <span class="count">${getBookmarkCount(currentStory)}</span>
+            <button class="reaction ${bookmarked.includes(id) ? 'active' : ''}" onclick="event.stopPropagation(); toggleBookmark('${id}')" style="display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:24px;font-size:15px;background:${bookmarked.includes(id) ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.05)'};border:1px solid ${bookmarked.includes(id) ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.1)'};">
+              <span style="font-size:22px;color:${bookmarked.includes(id) ? '#ffd700' : '#71767b'};">${bookmarked.includes(id) ? '🔖' : '📑'}</span>
+              <span style="color:${bookmarked.includes(id) ? '#ffd700' : '#71767b'};font-weight:600;">${getBookmarkCount(currentStory)}</span>
+            </button>
+            <button class="reaction" onclick="event.stopPropagation(); shareStory('${id}')" style="display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:24px;font-size:15px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);">
+              <span style="font-size:22px;">↗️</span>
             </button>
           </div>
         </div>
-        <div class="comments">
-          <h3 style="font-size:14px;font-weight:700;color:var(--text-secondary);margin-bottom:16px;">${comments.length} endings</h3>
+        
+        <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.07);">
+          <h4 style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">${comments.length} comments</h4>
+          
+          <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <input type="text" id="story-comment-input" placeholder="add a comment..." style="flex:1;padding:10px 14px;background:var(--bg-secondary);border:none;border-radius:20px;color:#fff;font-size:14px;" onkeypress="if(event.key==='Enter')submitStoryComment('${id}')"
+            <button onclick="submitStoryComment('${id}')" style="padding:10px 16px;background:#1d9bf0;border:none;border-radius:20px;color:#fff;font-size:13px;cursor:pointer;">post</button>
+          </div>
+          
           ${comments.map(c => {
             const canDeleteComment = (currentUser && currentUser.id === c.author_id) || isAdmin();
             const replies = c.replies || [];
             return `
-            <div class="comment ${c.is_story_ending ? 'ending' : ''} ${c.is_pinned ? 'pinned' : ''}" id="comment-${c.id}">
+            <div class="comment ${c.is_story_ending ? 'ending' : ''} ${c.is_pinned ? 'pinned' : ''}" id="comment-${c.id}" style="margin-bottom:16px;">
               <div class="comment-header">
                 <span class="comment-author">${c.author_name}<span style="color:#ffd700;">${getBadge(c.author_id)}</span></span>
                 ${c.is_story_ending ? '<span style="color:#1d9bf0;font-size:11px;">(finished story)</span>' : ''}
-                ${c.is_pinned ? '<span style="color:#1d9bf0;font-size:11px;">📌 pinned</span>' : ''}
+                ${c.is_pinned ? '<span style="color:#1d9bf0;font-size:11px;">📌</span>' : ''}
                 <span class="comment-time">${formatTime(c.created_at)}</span>
                 ${(isAuthor || isAdmin()) ? `<button class="pin-btn ${c.is_pinned ? 'pinned' : ''}" onclick="togglePin('${c.id}', ${!c.is_pinned})">${c.is_pinned ? 'unpin' : 'pin'}</button>` : ''}
-                ${canDeleteComment ? `<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;margin-left:4px;" onclick="deleteComment('${c.id}', '${id}')">del</button>` : ''}
+                ${canDeleteComment ? `<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;" onclick="deleteComment('${c.id}', '${id}')">del</button>` : ''}
               </div>
               <p class="comment-text">${c.content}</p>
               <button class="reply-btn" onclick="showReplyForm('${c.id}')">reply</button>
@@ -1714,15 +1897,7 @@
                   <button class="btn-submit-reply" onclick="submitReply('${c.id}', '${id}')">reply</button>
                 </div>
               </div>
-              ${replies.length > 0 ? replies.map(r => `
-                <div class="comment-reply">
-                  <div class="comment-header">
-                    <span class="comment-author">${r.author_name}<span style="color:#ffd700;">${getBadge(r.author_id)}</span></span>
-                    <span class="comment-time">${formatTime(r.created_at)}</span>
-                  </div>
-                  <p class="comment-text">${r.content}</p>
-                </div>
-              `).join('') : ''}
+              ${replies.length > 0 ? replies.map(r => renderReplyRecursive(r, id, 1)).join('') : ''}
             </div>
           `}).join('')}
         </div>
@@ -1733,6 +1908,22 @@
     async function togglePin(commentId, pin) {
       await sb.from('comments').update({ is_pinned: pin }).eq('id', commentId);
       if (currentStory) openStory(currentStory.id);
+    }
+    
+    async function submitStoryComment(storyId) {
+      if (!currentUser) { showLoginModal(); return; }
+      const input = $('story-comment-input');
+      const content = input.value.trim();
+      if (!content) return;
+      
+      await sb.from('comments').insert({
+        story_id: storyId, author_id: currentUser.id, author_name: currentUser.name,
+        content, is_story_ending: false, likes: 0, is_pinned: false, replies: [], created_at: new Date().toISOString()
+      });
+      await sb.from('stories').update({ comment_count: (currentStory.comment_count || 0) + 1 }).eq('id', storyId);
+      input.value = '';
+      showToast('comment added!');
+      openStory(storyId, false);
     }
     
     function showReplyForm(commentId) {
@@ -1762,6 +1953,7 @@
         author_id: currentUser.id,
         author_name: currentUser.name,
         content,
+        replies: [],
         created_at: new Date().toISOString()
       });
       
@@ -1769,6 +1961,107 @@
       hideReplyForm(commentId);
       showToast('reply added!');
       openStory(storyId, false);
+    }
+    
+    function renderReplyRecursive(reply, storyId, depth) {
+      const nestedReplies = reply.replies || [];
+      const canDelete = (currentUser && currentUser.id === reply.author_id) || isAdmin();
+      let html = `
+        <div class="comment-reply" style="margin-top:8px;margin-left:${Math.min(depth * 12, 48)}px;">
+          <div class="comment-header">
+            <span class="comment-author">${reply.author_name}<span style="color:#ffd700;">${getBadge(reply.author_id)}</span></span>
+            <span class="comment-time">${formatTime(reply.created_at)}</span>
+            ${canDelete ? `<button class="pin-btn" style="background:#dc3545;color:#fff;border-color:#dc3545;padding:2px 6px;font-size:10px;" onclick="deleteReply('${reply.id}', '${storyId}')">del</button>` : ''}
+          </div>
+          <p class="comment-text">${reply.content}</p>
+          <button class="reply-btn" onclick="showReplyForm('reply-${reply.id}')">reply</button>
+          <div class="reply-form" id="reply-form-reply-${reply.id}">
+            <textarea id="reply-text-reply-${reply.id}" placeholder="write a reply..."></textarea>
+            <div class="btn-row">
+              <button class="btn-cancel-reply" onclick="hideReplyForm('reply-${reply.id}')">cancel</button>
+              <button class="btn-submit-reply" onclick="submitNestedReply('${reply.id}', '${storyId}')">reply</button>
+            </div>
+          </div>
+          ${nestedReplies.length > 0 ? nestedReplies.map(r => renderReplyRecursive(r, storyId, depth + 1)).join('') : ''}
+        </div>
+      `;
+      return html;
+    }
+    
+    async function submitNestedReply(replyId, storyId) {
+      if (!currentUser) { showLoginModal(); return; }
+      const textarea = $('reply-text-reply-' + replyId);
+      const content = textarea.value.trim();
+      if (!content) { showToast('please write a reply'); return; }
+      
+      await addNestedReply(storyId, replyId, content);
+      hideReplyForm('reply-' + replyId);
+      showToast('reply added!');
+      openStory(storyId, false);
+    }
+    
+    async function addNestedReply(storyId, parentReplyId, content) {
+      const { data: comments } = await sb.from('comments').select('*').eq('story_id', storyId);
+      if (!comments) return;
+      
+      for (const comment of comments.data || []) {
+        const found = findAndAddReply(comment, parentReplyId, {
+          id: Date.now().toString(),
+          author_id: currentUser.id,
+          author_name: currentUser.name,
+          content,
+          replies: [],
+          created_at: new Date().toISOString()
+        });
+        if (found) break;
+      }
+    }
+    
+    function findAndAddReply(comment, replyId, newReply) {
+      const replies = comment.replies || [];
+      for (let i = 0; i < replies.length; i++) {
+        if (replies[i].id === replyId) {
+          if (!replies[i].replies) replies[i].replies = [];
+          replies[i].replies.push(newReply);
+          return true;
+        }
+        if (replies[i].replies && replies[i].replies.length > 0) {
+          if (findAndAddReply({ replies: replies[i].replies }, replyId, newReply)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    
+    async function deleteReply(replyId, storyId) {
+      if (!confirm('delete this reply?')) return;
+      await removeReplyFromComments(storyId, replyId);
+      showToast('reply deleted');
+      openStory(storyId, false);
+    }
+    
+    async function removeReplyFromComments(storyId, replyId) {
+      const { data: comments } = await sb.from('comments').select('*').eq('story_id', storyId);
+      for (const comment of comments.data || []) {
+        if (removeReplyRecursive(comment.replies || [], replyId)) {
+          await sb.from('comments').update({ replies: comment.replies }).eq('id', comment.id);
+          return;
+        }
+      }
+    }
+    
+    function removeReplyRecursive(replies, replyId) {
+      for (let i = 0; i < replies.length; i++) {
+        if (replies[i].id === replyId) {
+          replies.splice(i, 1);
+          return true;
+        }
+        if (replies[i].replies && removeReplyRecursive(replies[i].replies, replyId)) {
+          return true;
+        }
+      }
+      return false;
     }
 
     $('story-back').addEventListener('click', () => {
@@ -1780,18 +2073,6 @@
       if (!currentUser) { showLoginModal(); return; }
       const story = allStories.find(s => s.id === storyId) || currentStory;
       if (!story) return;
-      const reactions = story.reactions || { heart: 0, fire: 0, scream: 0, laugh: 0, cry: 0 };
-      const userReactions = story.user_reactions || {};
-      if (userReactions[currentUser.id] === type) {
-        reactions[type] = Math.max(0, reactions[type] - 1);
-        delete userReactions[currentUser.id];
-      } else {
-        if (userReactions[currentUser.id]) reactions[userReactions[currentUser.id]] = Math.max(0, reactions[userReactions[currentUser.id]] - 1);
-        reactions[type]++;
-        userReactions[currentUser.id] = type;
-      }
-      await sb.from('stories').update({ reactions, user_reactions: userReactions }).eq('id', storyId);
-      loadStories();
       if (currentStory && currentStory.id === storyId) openStory(storyId);
     }
 
@@ -1823,7 +2104,7 @@
 
     document.getElementById('finish-submit').addEventListener('click', async () => {
       const content = $('ending-content').value.trim();
-      if (content.length < 10) { showToast('ending must be at least 10 characters'); return; }
+      if (!content) { showToast('please write something'); return; }
       await sb.from('comments').insert({
         story_id: currentStory.id, author_id: currentUser.id, author_name: currentUser.name,
         content, is_story_ending: true, likes: 0, is_pinned: false, created_at: new Date().toISOString()
@@ -2430,7 +2711,6 @@
       await sb.from('stories').insert({
         title, content, category, is_finished: category === 'finished',
         author_id: currentUser.id, author_name: currentUser.name,
-        reactions: { heart: 0, fire: 0, scream: 0, laugh: 0, cry: 0 },
         user_reactions: {}, followers: [], comment_count: 0, created_at: new Date().toISOString()
       });
       $('story-title').value = '';
@@ -2469,9 +2749,6 @@
             </div>
             <h3 class="title">${s.title}</h3>
             <p class="preview">${s.content}</p>
-            <div class="reactions">
-              <button class="reaction">😀 <span style="font-size:11px;">${Object.values(s.reactions || {}).reduce((a, b) => a + b, 0)}</span></button>
-            </div>
           </div>
         `).join('');
         return;
@@ -2500,9 +2777,6 @@
             </div>
             <h3 class="title">${s.title}</h3>
             <p class="preview">${s.content}</p>
-            <div class="reactions">
-              <button class="reaction">😀 <span style="font-size:11px;">${Object.values(s.reactions || {}).reduce((a, b) => a + b, 0)}</span></button>
-            </div>
           </div>
         `).join('');
         return;
