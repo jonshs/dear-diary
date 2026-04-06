@@ -987,17 +987,24 @@
       const container = $('stories-container');
       container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
       if (!sb) { container.innerHTML = '<div class="empty"><h3>supabase not configured</h3></div>'; return; }
-      const { data, error } = await sb.from('stories').select('*').order('created_at', { ascending: false });
-      if (error) { container.innerHTML = `<div class="empty"><h3>error</h3><p>${error.message}</p></div>`; return; }
-      allStories = data || [];
       
-      // Load user roles for badges
-      const { data: profiles } = await sb.from('profiles').select('id, email, role, avatar');
-      if (profiles) {
-        profiles.forEach(p => { userRoles[p.id] = { role: p.role, email: p.email, avatar: p.avatar }; });
+      try {
+        const { data, error } = await sb.from('stories').select('*').order('created_at', { ascending: false });
+        if (error) { container.innerHTML = `<div class="empty"><h3>error</h3><p>${error.message}</p></div>`; return; }
+        allStories = data || [];
+        
+        // Load user roles for badges (ignore errors)
+        try {
+          const { data: profiles } = await sb.from('profiles').select('id, email, role, avatar');
+          if (profiles) {
+            profiles.forEach(p => { userRoles[p.id] = { role: p.role, email: p.email, avatar: p.avatar }; });
+          }
+        } catch(e) { console.log('Profiles load skipped'); }
+        
+        renderStories();
+      } catch(e) {
+        container.innerHTML = `<div class="empty"><h3>error loading</h3><p>${e.message}</p></div>`;
       }
-      
-      renderStories();
     }
 
     function highlightText(text, query) {
@@ -1411,7 +1418,7 @@
       }
     }
 
-    function showEditProfile() {
+    async function showEditProfile() {
       $('edit-profile-section').style.display = 'block';
       $('edit-display-name').value = currentUser.name;
       $('edit-username').value = currentUser.username || '';
